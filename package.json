@@ -1,0 +1,14 @@
+{
+  "name": "sketchvector",
+  "version": "1.0.0",
+  "description": "A canvas-based whiteboard application",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
