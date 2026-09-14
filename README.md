@@ -2,6 +2,10 @@
 
 A feature-rich whiteboard application built with vanilla JavaScript.
 
+## Live Demo
+
+**[https://dist-five-beige-23.vercel.app](https://dist-five-beige-23.vercel.app)**
+
 ## Features
 - Drawing tools: Pen, Highlighter, Shapes, Text
 - Selection and manipulation
