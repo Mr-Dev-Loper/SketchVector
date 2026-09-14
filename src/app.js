@@ -39,10 +39,12 @@ export default class App {
         this.grid = null
         this.contextMenu = null
         this.clipboard = null
+        this.themeManager = null
     }
 
     init() {
         this.container = document.getElementById('app-container') || document.body
+        this.themeManager = new ThemeManager()
 
         this.state = new StateManager()
         this.history = new History()
@@ -565,6 +567,12 @@ export default class App {
 
         if (e.key === 'g' && !e.ctrlKey && !e.metaKey) {
             this.grid.toggle()
+            this._drawCanvas()
+        }
+
+        if (e.key === 'T' && e.ctrlKey && e.metaKey) {
+            e.preventDefault()
+            this.themeManager.toggle()
             this._drawCanvas()
         }
 

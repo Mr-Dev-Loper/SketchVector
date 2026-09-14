@@ -12,8 +12,8 @@ html, body {
     overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-size: 13px;
-    color: #fff;
-    background: #1e1e1e;
+    color: var(--text-primary);
+    background: var(--bg-primary);
 }
 
 canvas#canvas {
@@ -27,8 +27,8 @@ canvas#canvas {
     left: 0;
     right: 0;
     height: 48px;
-    background: #2d2d2d;
-    border-bottom: 1px solid #3a3a3a;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     padding: 0 8px;
@@ -46,7 +46,7 @@ canvas#canvas {
 .sv-toolbar__separator {
     width: 1px;
     height: 28px;
-    background: #444;
+    background: var(--border);
     margin: 0 4px;
 }
 
@@ -60,18 +60,18 @@ canvas#canvas {
     border: none;
     border-radius: 6px;
     background: transparent;
-    color: #ccc;
+    color: var(--text-secondary);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 18px;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
 .sv-toolbar__btn:hover {
-    background: #3a3a3a;
-    color: #fff;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 .sv-toolbar__btn:active {
@@ -89,12 +89,12 @@ canvas#canvas {
 }
 
 .sv-toolbar__btn--active {
-    background: #4a86e8;
+    background: var(--accent);
     color: #fff;
 }
 
 .sv-toolbar__btn--active:hover {
-    background: #5a96f8;
+    background: var(--accent-hover);
 }
 
 .sv-toolbar__btn-label {
@@ -112,13 +112,13 @@ canvas#canvas {
     position: absolute;
     top: 44px;
     right: 12px;
-    background: #2d2d2d;
-    border: 1px solid #444;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 4px 0;
     min-width: 120px;
     z-index: 1001;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    box-shadow: var(--shadow);
 }
 
 .sv-toolbar__dropdown-item {
@@ -127,15 +127,15 @@ canvas#canvas {
     padding: 8px 16px;
     border: none;
     background: transparent;
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 13px;
     text-align: left;
     cursor: pointer;
 }
 
 .sv-toolbar__dropdown-item:hover {
-    background: #3a3a3a;
-    color: #fff;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 /* ===== Properties Panel ===== */
@@ -145,8 +145,8 @@ canvas#canvas {
     right: 0;
     width: 250px;
     height: calc(100vh - 48px);
-    background: #2d2d2d;
-    border-left: 1px solid #3a3a3a;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     z-index: 900;
@@ -158,7 +158,7 @@ canvas#canvas {
     align-items: center;
     justify-content: space-between;
     padding: 10px 12px;
-    border-bottom: 1px solid #3a3a3a;
+    border-bottom: 1px solid var(--border);
     font-weight: 600;
     font-size: 13px;
 }
@@ -166,17 +166,17 @@ canvas#canvas {
 .sv-properties-panel__toggle {
     border: none;
     background: transparent;
-    color: #aaa;
+    color: var(--text-secondary);
     cursor: pointer;
     font-size: 12px;
     padding: 2px 6px;
     border-radius: 4px;
-    transition: background 0.15s;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
 .sv-properties-panel__toggle:hover {
-    background: #3a3a3a;
-    color: #fff;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 .sv-properties-panel__body {
@@ -192,7 +192,7 @@ canvas#canvas {
 .sv-properties-panel__group {
     margin-bottom: 12px;
     padding-bottom: 12px;
-    border-bottom: 1px solid #3a3a3a;
+    border-bottom: 1px solid var(--border);
 }
 
 .sv-properties-panel__group:last-child {
@@ -212,24 +212,25 @@ canvas#canvas {
 
 .sv-properties-panel__row label {
     font-size: 12px;
-    color: #aaa;
+    color: var(--text-secondary);
     min-width: 20px;
 }
 
 .sv-properties-panel__input {
     flex: 1;
-    background: #1e1e1e;
-    border: 1px solid #444;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
     border-radius: 4px;
-    color: #fff;
+    color: var(--text-primary);
     padding: 4px 8px;
     font-size: 12px;
     outline: none;
     width: 100%;
+    transition: border-color 0.2s ease;
 }
 
 .sv-properties-panel__input:focus {
-    border-color: #4a86e8;
+    border-color: var(--accent);
 }
 
 .sv-properties-panel__input--sm {
@@ -239,7 +240,7 @@ canvas#canvas {
 
 .sv-properties-panel__range {
     flex: 1;
-    accent-color: #4a86e8;
+    accent-color: var(--accent);
     height: 4px;
 }
 
@@ -252,7 +253,7 @@ canvas#canvas {
 
 .sv-properties-panel__slider-wrap span {
     font-size: 11px;
-    color: #888;
+    color: var(--text-secondary);
     min-width: 32px;
     text-align: right;
 }
@@ -265,6 +266,7 @@ canvas#canvas {
 
 .sv-properties-panel__group--position label {
     font-size: 11px;
+    color: var(--text-secondary);
 }
 
 /* ===== Color Picker ===== */
@@ -275,7 +277,7 @@ canvas#canvas {
 .sv-color-picker__label {
     display: block;
     font-size: 12px;
-    color: #aaa;
+    color: var(--text-secondary);
     margin-bottom: 4px;
 }
 
@@ -283,35 +285,35 @@ canvas#canvas {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: #1e1e1e;
-    border: 1px solid #444;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
     border-radius: 4px;
     padding: 4px 8px;
     cursor: pointer;
-    transition: border-color 0.15s;
+    transition: border-color 0.2s ease;
 }
 
 .sv-color-picker__trigger:hover {
-    border-color: #666;
+    border-color: var(--text-secondary);
 }
 
 .sv-color-picker__trigger:focus {
     outline: none;
-    border-color: #4a86e8;
+    border-color: var(--accent);
 }
 
 .sv-color-picker__swatch {
     width: 20px;
     height: 20px;
     border-radius: 3px;
-    border: 1px solid #555;
+    border: 1px solid var(--border);
     flex-shrink: 0;
 }
 
 .sv-color-picker__hex {
     background: transparent;
     border: none;
-    color: #fff;
+    color: var(--text-primary);
     font-size: 12px;
     width: 70px;
     outline: none;
@@ -321,13 +323,13 @@ canvas#canvas {
 .sv-color-picker__palette {
     position: absolute;
     margin-top: 4px;
-    background: #2d2d2d;
-    border: 1px solid #444;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 10px;
     z-index: 1100;
     width: 210px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    box-shadow: var(--shadow-lg);
 }
 
 .sv-color-picker__swatches {
@@ -342,9 +344,9 @@ canvas#canvas {
     width: 22px;
     height: 22px;
     border-radius: 3px;
-    border: 1px solid #555;
+    border: 1px solid var(--border);
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: transform 0.2s ease;
 }
 
 .sv-color-picker__preset:hover,
@@ -354,7 +356,7 @@ canvas#canvas {
 }
 
 .sv-color-picker__preset--active {
-    outline: 2px solid #4a86e8;
+    outline: 2px solid var(--accent);
     outline-offset: 1px;
 }
 
@@ -367,24 +369,25 @@ canvas#canvas {
 
 .sv-color-picker__custom label {
     font-size: 11px;
-    color: #888;
+    color: var(--text-secondary);
 }
 
 .sv-color-picker__custom-input {
     flex: 1;
-    background: #1e1e1e;
-    border: 1px solid #444;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
     border-radius: 3px;
-    color: #fff;
+    color: var(--text-primary);
     padding: 3px 6px;
     font-size: 12px;
     font-family: monospace;
     outline: none;
     width: 70px;
+    transition: border-color 0.2s ease;
 }
 
 .sv-color-picker__custom-input:focus {
-    border-color: #4a86e8;
+    border-color: var(--accent);
 }
 
 .sv-color-picker__native {
@@ -406,17 +409,17 @@ canvas#canvas {
 
 .sv-color-picker__opacity label {
     font-size: 11px;
-    color: #888;
+    color: var(--text-secondary);
 }
 
 .sv-color-picker__opacity-slider {
     flex: 1;
-    accent-color: #4a86e8;
+    accent-color: var(--accent);
 }
 
 .sv-color-picker__opacity-val {
     font-size: 11px;
-    color: #888;
+    color: var(--text-secondary);
     min-width: 28px;
     text-align: right;
 }
@@ -427,7 +430,7 @@ canvas#canvas {
 
 .sv-color-picker__recent label {
     font-size: 11px;
-    color: #888;
+    color: var(--text-secondary);
     display: block;
     margin-bottom: 4px;
 }
@@ -441,18 +444,18 @@ canvas#canvas {
 .sv-color-picker__none {
     width: 100%;
     padding: 5px;
-    border: 1px solid #444;
+    border: 1px solid var(--border);
     border-radius: 3px;
     background: transparent;
-    color: #aaa;
+    color: var(--text-secondary);
     font-size: 11px;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
 .sv-color-picker__none:hover {
-    background: #3a3a3a;
-    color: #fff;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 /* ===== Layers Panel ===== */
@@ -462,8 +465,8 @@ canvas#canvas {
     left: 0;
     width: 200px;
     height: calc(100vh - 48px);
-    background: #2d2d2d;
-    border-right: 1px solid #3a3a3a;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
     z-index: 900;
@@ -475,7 +478,7 @@ canvas#canvas {
     align-items: center;
     justify-content: space-between;
     padding: 10px 10px;
-    border-bottom: 1px solid #3a3a3a;
+    border-bottom: 1px solid var(--border);
     font-weight: 600;
     font-size: 13px;
 }
@@ -491,18 +494,18 @@ canvas#canvas {
     border: none;
     border-radius: 4px;
     background: transparent;
-    color: #aaa;
+    color: var(--text-secondary);
     font-size: 16px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
 .sv-layers-panel__btn:hover {
-    background: #3a3a3a;
-    color: #fff;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
 }
 
 .sv-layers-panel__body {
@@ -521,17 +524,17 @@ canvas#canvas {
     gap: 6px;
     padding: 6px 10px;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background 0.2s ease;
     font-size: 12px;
 }
 
 .sv-layers-panel__layer:hover,
 .sv-layers-panel__item:hover {
-    background: #3a3a3a;
+    background: var(--bg-tertiary);
 }
 
 .sv-layers-panel__item--selected {
-    background: #4a86e8 !important;
+    background: var(--accent) !important;
 }
 
 .sv-layers-panel__layer-icon,
@@ -552,18 +555,18 @@ canvas#canvas {
 .sv-layers-panel__item-btn {
     border: none;
     background: transparent;
-    color: #888;
+    color: var(--text-secondary);
     font-size: 12px;
     cursor: pointer;
     padding: 2px;
     border-radius: 3px;
     flex-shrink: 0;
-    transition: color 0.15s;
+    transition: color 0.2s ease;
 }
 
 .sv-layers-panel__layer-btn:hover,
 .sv-layers-panel__item-btn:hover {
-    color: #fff;
+    color: var(--text-primary);
 }
 
 .sv-layers-panel__footer {
@@ -571,22 +574,22 @@ canvas#canvas {
     align-items: center;
     gap: 6px;
     padding: 8px 10px;
-    border-top: 1px solid #3a3a3a;
+    border-top: 1px solid var(--border);
 }
 
 .sv-layers-panel__footer label {
     font-size: 11px;
-    color: #888;
+    color: var(--text-secondary);
 }
 
 .sv-layers-panel__opacity {
     flex: 1;
-    accent-color: #4a86e8;
+    accent-color: var(--accent);
 }
 
 .sv-layers-panel__opacity-val {
     font-size: 11px;
-    color: #888;
+    color: var(--text-secondary);
     min-width: 28px;
     text-align: right;
 }
@@ -596,12 +599,12 @@ canvas#canvas {
     position: fixed;
     bottom: 16px;
     right: 266px;
-    border: 1px solid #444;
+    border: 1px solid var(--border);
     border-radius: 6px;
     overflow: hidden;
     z-index: 800;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    box-shadow: var(--shadow-sm);
 }
 
 .sv-minimap canvas {
@@ -611,13 +614,13 @@ canvas#canvas {
 /* ===== Context Menu ===== */
 .sv-context-menu {
     position: fixed;
-    background: #2d2d2d;
-    border: 1px solid #444;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
     border-radius: 6px;
     padding: 4px 0;
     min-width: 180px;
     z-index: 2000;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    box-shadow: var(--shadow-lg);
 }
 
 .sv-context-menu__item {
@@ -628,15 +631,15 @@ canvas#canvas {
     padding: 8px 16px;
     border: none;
     background: transparent;
-    color: #ccc;
+    color: var(--text-secondary);
     font-size: 13px;
     text-align: left;
     cursor: pointer;
-    transition: background 0.1s;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
 .sv-context-menu__item:hover {
-    background: #4a86e8;
+    background: var(--accent);
     color: #fff;
 }
 
@@ -647,7 +650,7 @@ canvas#canvas {
 
 .sv-context-menu__item--disabled:hover {
     background: transparent;
-    color: #ccc;
+    color: var(--text-secondary);
 }
 
 .sv-context-menu__label {
@@ -656,7 +659,7 @@ canvas#canvas {
 
 .sv-context-menu__shortcut {
     font-size: 11px;
-    color: #888;
+    color: var(--text-secondary);
     margin-left: 20px;
 }
 
@@ -666,51 +669,6 @@ canvas#canvas {
 
 .sv-context-menu__separator {
     height: 1px;
-    background: #444;
+    background: var(--border);
     margin: 4px 0;
-}
-
-/* ===== Dark/Light Theme ===== */
-body.theme-light {
-    background: #f5f5f5;
-    color: #333;
-}
-
-body.theme-light .sv-toolbar {
-    background: #ffffff;
-    border-bottom: 1px solid #e0e0e0;
-}
-
-body.theme-light .sv-toolbar__btn {
-    color: #555;
-}
-
-body.theme-light .sv-toolbar__btn:hover {
-    background: #e8e8e8;
-    color: #333;
-}
-
-body.theme-light .sv-properties-panel,
-body.theme-light .sv-layers-panel {
-    background: #ffffff;
-    border-color: #e0e0e0;
-}
-
-body.theme-light .sv-context-menu {
-    background: #ffffff;
-    border-color: #e0e0e0;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-}
-
-body.theme-light .sv-context-menu__item {
-    color: #333;
-}
-
-body.theme-light .sv-context-menu__item:hover {
-    background: #4a86e8;
-    color: #fff;
-}
-
-body.theme-light .sv-context-menu__separator {
-    background: #e0e0e0;
 }

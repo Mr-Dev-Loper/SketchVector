@@ -1,0 +1,47 @@
+/* Theme variables */
+:root {
+  /* Dark theme (default) */
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #3d3d3d;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --accent: #4a86e8;
+  --accent-hover: #5a96f8;
+  --border: #404040;
+  --success: #4caf50;
+  --warning: #ff9800;
+  --danger: #f44336;
+  --canvas-bg: #2a2a2a;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #e8e8e8;
+  --text-primary: #1e1e1e;
+  --text-secondary: #666666;
+  --accent: #2196f3;
+  --accent-hover: #1976d2;
+  --border: #d0d0d0;
+  --canvas-bg: #ffffff;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Smooth transitions for theme switching */
+body,
+.sv-toolbar,
+.sv-properties-panel,
+.sv-layers-panel,
+.sv-minimap,
+.sv-toolbar__btn,
+.sv-properties-panel__input,
+.sv-layers-panel__item,
+.sv-color-picker__trigger {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}

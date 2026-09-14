@@ -1,3 +1,4 @@
+import './styles/themes.css'
 import './styles/main.css'
 import App from './app.js'
 
