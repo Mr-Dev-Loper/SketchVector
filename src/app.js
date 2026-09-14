@@ -1,4 +1,3 @@
-import Canvas from './canvas/Canvas.js'
 import Viewport from './canvas/Viewport.js'
 import Renderer from './canvas/Renderer.js'
 import ToolManager from './tools/ToolManager.js'
@@ -33,7 +32,6 @@ export default class App {
         this.propertiesPanel = null
         this.layersPanel = null
         this.minimap = null
-        this.animationId = null
         this.isPanning = false
         this.panStart = null
         this.grid = null
@@ -59,7 +57,7 @@ export default class App {
         this._setupUI()
         this._bindEvents()
         this._loadSavedState()
-        this._startRenderLoop()
+        this._drawCanvas()
 
         console.log('SketchVector initialized')
     }
@@ -190,7 +188,9 @@ export default class App {
 
     _updateUI() {
         const state = this.state.getState()
-        this.toolbar.setActiveTool(state.activeTool)
+        if (this.toolbar.activeTool !== state.activeTool) {
+            this.toolbar.setActiveTool(state.activeTool)
+        }
         this.toolbar.setHistoryState(this.history.canUndo(), this.history.canRedo())
         this.propertiesPanel.updateState(state)
 
@@ -306,7 +306,7 @@ export default class App {
             if (b) {
                 ctx.setLineDash([4, 4])
                 ctx.strokeStyle = '#4a86e8'
-                ctx.lineWidth = 1 / this.viewport.zoom
+                ctx.lineWidth = 1 / this.viewport.zoomLevel
                 ctx.strokeRect(b.x - 4, b.y - 4, b.w + 8, b.h + 8)
                 ctx.setLineDash([])
             }
@@ -570,7 +570,7 @@ export default class App {
             this._drawCanvas()
         }
 
-        if (e.key === 'T' && e.ctrlKey && e.metaKey) {
+        if (e.key === 'T' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
             e.preventDefault()
             this.themeManager.toggle()
             this._drawCanvas()
@@ -605,13 +605,5 @@ export default class App {
         if (autoSaved) {
             this.state.setState(autoSaved)
         }
-    }
-
-    _startRenderLoop() {
-        const render = () => {
-            this._drawCanvas()
-            this.animationId = requestAnimationFrame(render)
-        }
-        render()
     }
 }
