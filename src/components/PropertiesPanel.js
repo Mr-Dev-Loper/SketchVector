@@ -140,7 +140,13 @@ export default class PropertiesPanel {
 
         const setVal = (sel, val) => {
             const el = this.el.querySelector(sel)
-            if (el) el.value = val
+            if (el) {
+                if (el.tagName === 'SPAN') {
+                    el.textContent = val
+                } else {
+                    el.value = val
+                }
+            }
         }
         setVal('#sv-pp-stroke-width', this.state.strokeWidth || 2)
         setVal('#sv-pp-stroke-width-val', (this.state.strokeWidth || 2) + 'px')
