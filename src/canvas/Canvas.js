@@ -62,7 +62,7 @@ export default class Canvas {
     }
 
     hitTest(shape, x, y) {
-        const margin = 5 / this.viewport.zoom;
+        const margin = 5 / this.viewport.zoomLevel;
 
         switch (shape.type) {
             case 'rect':

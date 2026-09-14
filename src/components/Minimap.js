@@ -113,10 +113,10 @@ export default class Minimap {
 
     _drawViewport(offsetX = 0, offsetY = 0, scale = 1) {
         const ctx = this.ctx
-        const screenW = this.canvasWidth / this.viewport.zoom
-        const screenH = this.canvasHeight / this.viewport.zoom
-        const screenX = -this.viewport.x / this.viewport.zoom
-        const screenY = -this.viewport.y / this.viewport.zoom
+        const screenW = this.canvasWidth / this.viewport.zoomLevel
+        const screenH = this.canvasHeight / this.viewport.zoomLevel
+        const screenX = -this.viewport.x / this.viewport.zoomLevel
+        const screenY = -this.viewport.y / this.viewport.zoomLevel
 
         const vx = screenX * scale + offsetX
         const vy = screenY * scale + offsetY
@@ -183,8 +183,8 @@ export default class Minimap {
             const worldX = (clickX - offsetX) / scale
             const worldY = (clickY - offsetY) / scale
 
-            const screenX = worldX * this.viewport.zoom + this.viewport.x
-            const screenY = worldY * this.viewport.zoom + this.viewport.y
+            const screenX = worldX * this.viewport.zoomLevel + this.viewport.x
+            const screenY = worldY * this.viewport.zoomLevel + this.viewport.y
 
             this.onClick(screenX, screenY)
         })

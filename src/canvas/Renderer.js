@@ -29,10 +29,10 @@ export default class Renderer {
         const gridSize = this.gridSize;
         const ctx = this.ctx;
 
-        const startX = Math.floor(-viewport.x / viewport.zoom / gridSize) * gridSize - gridSize;
-        const startY = Math.floor(-viewport.y / viewport.zoom / gridSize) * gridSize - gridSize;
-        const endX = startX + this.canvas.width / viewport.zoom + gridSize * 2;
-        const endY = startY + this.canvas.height / viewport.zoom + gridSize * 2;
+        const startX = Math.floor(-viewport.x / viewport.zoomLevel / gridSize) * gridSize - gridSize;
+        const startY = Math.floor(-viewport.y / viewport.zoomLevel / gridSize) * gridSize - gridSize;
+        const endX = startX + this.canvas.width / viewport.zoomLevel + gridSize * 2;
+        const endY = startY + this.canvas.height / viewport.zoomLevel + gridSize * 2;
 
         ctx.strokeStyle = '#e0e0e0';
         ctx.lineWidth = 0.5;

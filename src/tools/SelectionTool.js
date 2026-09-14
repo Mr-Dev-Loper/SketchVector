@@ -133,7 +133,7 @@ export default class SelectionTool {
     }
 
     _pointInShape(x, y, shape) {
-        const margin = 5 / (this.tm.viewport ? this.tm.viewport.zoom : 1)
+        const margin = 5 / (this.tm.viewport ? this.tm.viewport.zoomLevel : 1)
         switch (shape.type) {
             case 'rect':
                 if (shape.isDiamond) {

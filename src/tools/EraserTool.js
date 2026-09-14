@@ -40,7 +40,7 @@ export default class EraserTool {
 
     _eraseAt(pos) {
         const state = this.tm.state.getState()
-        const r = this.eraserRadius / (this.tm.viewport ? this.tm.viewport.zoom : 1)
+        const r = this.eraserRadius / (this.tm.viewport ? this.tm.viewport.zoomLevel : 1)
 
         for (const shape of state.shapes) {
             if (this.erasedIds.has(shape.id)) continue
@@ -57,7 +57,7 @@ export default class EraserTool {
 
     _eraseAlongPath(from, to) {
         const state = this.tm.state.getState()
-        const r = this.eraserRadius / (this.tm.viewport ? this.tm.viewport.zoom : 1)
+        const r = this.eraserRadius / (this.tm.viewport ? this.tm.viewport.zoomLevel : 1)
 
         const dx = to.x - from.x
         const dy = to.y - from.y

@@ -29,7 +29,7 @@ export default class PenTool {
         const dy = pos.y - this.lastPoint.y
         const dist = Math.sqrt(dx * dx + dy * dy)
 
-        if (dist < 2 / (this.tm.viewport ? this.tm.viewport.zoom : 1)) return
+        if (dist < 2 / (this.tm.viewport ? this.tm.viewport.zoomLevel : 1)) return
 
         const pressure = e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5
         this.currentPath.points.push({ x: pos.x, y: pos.y })

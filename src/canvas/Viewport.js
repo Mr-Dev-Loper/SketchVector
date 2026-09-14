@@ -2,7 +2,7 @@ export default class Viewport {
     constructor() {
         this.x = 0;
         this.y = 0;
-        this.zoom = 1;
+        this.zoomLevel = 1;
         this.minZoom = 0.1;
         this.maxZoom = 10;
     }
@@ -14,27 +14,27 @@ export default class Viewport {
 
     zoom(delta, centerX, centerY) {
         const zoomFactor = delta > 0 ? 0.9 : 1.1;
-        const newZoom = Math.min(this.maxZoom, Math.max(this.minZoom, this.zoom * zoomFactor));
+        const newZoom = Math.min(this.maxZoom, Math.max(this.minZoom, this.zoomLevel * zoomFactor));
 
-        const worldX = (centerX - this.x) / this.zoom;
-        const worldY = (centerY - this.y) / this.zoom;
+        const worldX = (centerX - this.x) / this.zoomLevel;
+        const worldY = (centerY - this.y) / this.zoomLevel;
 
-        this.zoom = newZoom;
-        this.x = centerX - worldX * this.zoom;
-        this.y = centerY - worldY * this.zoom;
+        this.zoomLevel = newZoom;
+        this.x = centerX - worldX * this.zoomLevel;
+        this.y = centerY - worldY * this.zoomLevel;
     }
 
     screenToWorld(screenX, screenY) {
         return {
-            x: (screenX - this.x) / this.zoom,
-            y: (screenY - this.y) / this.zoom
+            x: (screenX - this.x) / this.zoomLevel,
+            y: (screenY - this.y) / this.zoomLevel
         };
     }
 
     worldToScreen(worldX, worldY) {
         return {
-            x: worldX * this.zoom + this.x,
-            y: worldY * this.zoom + this.y
+            x: worldX * this.zoomLevel + this.x,
+            y: worldY * this.zoomLevel + this.y
         };
     }
 
@@ -42,7 +42,7 @@ export default class Viewport {
         if (!contentBounds) {
             this.x = 0;
             this.y = 0;
-            this.zoom = 1;
+            this.zoomLevel = 1;
             return;
         }
 
@@ -53,29 +53,29 @@ export default class Viewport {
         if (contentWidth === 0 || contentHeight === 0) {
             this.x = 0;
             this.y = 0;
-            this.zoom = 1;
+            this.zoomLevel = 1;
             return;
         }
 
         const scaleX = (width - padding * 2) / contentWidth;
         const scaleY = (height - padding * 2) / contentHeight;
-        this.zoom = Math.min(scaleX, scaleY);
+        this.zoomLevel = Math.min(scaleX, scaleY);
 
-        this.x = (width - contentWidth * this.zoom) / 2 - contentBounds.minX * this.zoom;
-        this.y = (height - contentHeight * this.zoom) / 2 - contentBounds.minY * this.zoom;
+        this.x = (width - contentWidth * this.zoomLevel) / 2 - contentBounds.minX * this.zoomLevel;
+        this.y = (height - contentHeight * this.zoomLevel) / 2 - contentBounds.minY * this.zoomLevel;
     }
 
     getTransform() {
         return {
             x: this.x,
             y: this.y,
-            zoom: this.zoom
+            zoom: this.zoomLevel
         };
     }
 
     applyTransform(ctx) {
         ctx.translate(this.x, this.y);
-        ctx.scale(this.zoom, this.zoom);
+        ctx.scale(this.zoomLevel, this.zoomLevel);
     }
 
     resetTransform(ctx) {

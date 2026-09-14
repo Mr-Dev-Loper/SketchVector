@@ -32,7 +32,7 @@ export default class Grid {
     render(ctx, canvasWidth, canvasHeight) {
         if (!this.enabled) return;
 
-        const zoom = this.viewport.zoom;
+        const zoom = this.viewport.zoomLevel;
         const offsetX = this.viewport.x;
         const offsetY = this.viewport.y;
         const size = this.size;
