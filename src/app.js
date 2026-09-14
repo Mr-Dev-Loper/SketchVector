@@ -1,37 +1,54 @@
+import Canvas from './canvas/Canvas.js'
+import Viewport from './canvas/Viewport.js'
+import Renderer from './canvas/Renderer.js'
+import ToolManager from './tools/ToolManager.js'
+import PenTool from './tools/PenTool.js'
+import ShapeTool from './tools/ShapeTool.js'
+import TextTool from './tools/TextTool.js'
+import EraserTool from './tools/EraserTool.js'
+import SelectionTool from './tools/SelectionTool.js'
+import StateManager from './state/StateManager.js'
+import History from './state/History.js'
+import Storage from './state/Storage.js'
 import Toolbar from './components/Toolbar.js'
 import PropertiesPanel from './components/PropertiesPanel.js'
 import LayersPanel from './components/LayersPanel.js'
 import Minimap from './components/Minimap.js'
-import Canvas from './canvas/Canvas.js'
-import Viewport from './canvas/Viewport.js'
-import StateManager from './state/StateManager.js'
-import History from './state/History.js'
 
 export default class App {
     constructor() {
-        this.container = null
+        this.state = null
+        this.history = null
+        this.storage = null
+        this.viewport = null
         this.canvas = null
         this.ctx = null
-        this.stateManager = null
-        this.history = null
+        this.renderer = null
+        this.toolManager = null
         this.toolbar = null
         this.propertiesPanel = null
         this.layersPanel = null
         this.minimap = null
-        this.viewport = null
+        this.animationId = null
+        this.isPanning = false
+        this.panStart = null
     }
 
     init() {
         this.container = document.getElementById('app-container') || document.body
 
-        this.stateManager = new StateManager()
+        this.state = new StateManager()
         this.history = new History()
-
+        this.storage = new Storage()
         this.viewport = new Viewport()
+
         this._setupCanvas()
+        this.renderer = new Renderer(this.canvas)
+        this.toolManager = new ToolManager(this.canvas, this.state, this.viewport, this.history)
         this._setupUI()
         this._bindEvents()
-        this._updateUI()
+        this._loadSavedState()
+        this._startRenderLoop()
 
         console.log('SketchVector initialized')
     }
@@ -41,7 +58,7 @@ export default class App {
         if (!this.canvas) {
             this.canvas = document.createElement('canvas')
             this.canvas.id = 'canvas'
-            document.body.appendChild(this.canvas)
+            this.container.appendChild(this.canvas)
         }
         this.ctx = this.canvas.getContext('2d')
         this._resizeCanvas()
@@ -57,8 +74,10 @@ export default class App {
     }
 
     _setupUI() {
+        const state = this.state.getState()
+
         this.toolbar = new Toolbar({
-            activeTool: this.stateManager.getState().activeTool,
+            activeTool: state.activeTool,
             onToolSelect: (tool) => this._onToolSelect(tool),
             onUndo: () => this._onUndo(),
             onRedo: () => this._onRedo(),
@@ -67,18 +86,18 @@ export default class App {
             onZoomFit: () => this._onZoomFit(),
             onExport: (format) => this._onExport(format)
         })
-        this.toolbar.mount(document.body)
+        this.toolbar.mount(this.container)
 
         this.propertiesPanel = new PropertiesPanel({
-            state: this.stateManager.getState(),
+            state: state,
             onChange: (prop, val) => this._onPropertyChange(prop, val)
         })
-        this.propertiesPanel.mount(document.body)
+        this.propertiesPanel.mount(this.container)
 
         this.layersPanel = new LayersPanel({
-            shapes: this.stateManager.getState().shapes,
-            layers: this.stateManager.getState().layers,
-            selectedIds: this.stateManager.getState().selectedIds,
+            shapes: state.shapes,
+            layers: state.layers,
+            selectedIds: state.selectedIds,
             onSelect: (id) => this._onLayerSelect(id),
             onToggleVisibility: (id) => this._onToggleVisibility(id),
             onToggleLock: (id) => this._onToggleLock(id),
@@ -86,32 +105,77 @@ export default class App {
             onAddLayer: () => this._onAddLayer(),
             onOpacityChange: (opacity) => this._onPropertyChange('opacity', opacity)
         })
-        this.layersPanel.mount(document.body)
+        this.layersPanel.mount(this.container)
 
         this.minimap = new Minimap({
-            shapes: this.stateManager.getState().shapes,
+            shapes: state.shapes,
             viewport: this.viewport.getTransform(),
             canvasWidth: this.canvas.width,
             canvasHeight: this.canvas.height,
             onClick: (x, y) => this._onMinimapClick(x, y)
         })
-        this.minimap.mount(document.body)
+        this.minimap.mount(this.container)
     }
 
     _bindEvents() {
-        this.stateManager.subscribe(() => this._updateUI())
+        this.state.subscribe(() => this._updateUI())
 
         this.canvas.addEventListener('wheel', (e) => {
             e.preventDefault()
-            if (e.deltaY < 0) this._onZoomIn()
-            else this._onZoomOut()
+            const delta = e.deltaY > 0 ? -0.1 : 0.1
+            this.viewport.zoom(delta, e.clientX, e.clientY)
+            this._drawCanvas()
+            this._updateMinimap()
+        })
+
+        this.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
+
+        this.canvas.addEventListener('mousedown', (e) => {
+            if (e.button === 1 || (e.button === 0 && e.shiftKey && !this.toolManager.activeToolName?.includes('select'))) {
+                this.isPanning = true
+                this.panStart = { x: e.clientX, y: e.clientY }
+                this.canvas.style.cursor = 'grabbing'
+                e.preventDefault()
+            }
+        })
+
+        this.canvas.addEventListener('mousemove', (e) => {
+            if (this.isPanning && this.panStart) {
+                const dx = e.clientX - this.panStart.x
+                const dy = e.clientY - this.panStart.y
+                this.viewport.pan(dx, dy)
+                this.panStart = { x: e.clientX, y: e.clientY }
+                this._drawCanvas()
+                this._updateMinimap()
+            }
+        })
+
+        this.canvas.addEventListener('mouseup', (e) => {
+            if (this.isPanning) {
+                this.isPanning = false
+                this.panStart = null
+                if (this.toolManager) {
+                    this.canvas.style.cursor = ''
+                }
+            }
+        })
+
+        this.canvas.addEventListener('redraw', () => {
+            this._drawCanvas()
         })
 
         document.addEventListener('keydown', (e) => this._onKeyDown(e))
+        window.addEventListener('resize', () => this._onResize())
+
+        document.addEventListener('tool-select', (e) => {
+            this.toolManager.setTool(e.detail.tool)
+        })
+
+        this._autoSaveInterval = setInterval(() => this._autoSave(), 30000)
     }
 
     _updateUI() {
-        const state = this.stateManager.getState()
+        const state = this.state.getState()
         this.toolbar.setActiveTool(state.activeTool)
         this.toolbar.setHistoryState(this.history.canUndo(), this.history.canRedo())
         this.propertiesPanel.updateState(state)
@@ -141,7 +205,7 @@ export default class App {
 
     _updateMinimap() {
         this.minimap.update(
-            this.stateManager.getState().shapes,
+            this.state.getState().shapes,
             this.viewport.getTransform(),
             this.canvas.width,
             this.canvas.height
@@ -149,7 +213,7 @@ export default class App {
     }
 
     _drawCanvas() {
-        const state = this.stateManager.getState()
+        const state = this.state.getState()
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
         this.ctx.save()
         this.viewport.applyTransform(this.ctx)
@@ -166,7 +230,6 @@ export default class App {
         const ctx = this.ctx
         ctx.globalAlpha = shape.opacity ?? 1
         ctx.lineWidth = shape.strokeWidth || 2
-
         if (shape.fill && shape.fill !== 'transparent') {
             ctx.fillStyle = shape.fill
         }
@@ -174,8 +237,21 @@ export default class App {
 
         switch (shape.type) {
             case 'rect':
-                if (shape.fill && shape.fill !== 'transparent') ctx.fillRect(shape.x, shape.y, shape.width, shape.height)
-                ctx.strokeRect(shape.x, shape.y, shape.width, shape.height)
+                if (shape.isDiamond || shape._diamond) {
+                    ctx.beginPath()
+                    const cx = shape.x + shape.width / 2
+                    const cy = shape.y + shape.height / 2
+                    ctx.moveTo(cx, shape.y)
+                    ctx.lineTo(shape.x + shape.width, cy)
+                    ctx.lineTo(cx, shape.y + shape.height)
+                    ctx.lineTo(shape.x, cy)
+                    ctx.closePath()
+                    if (shape.fill && shape.fill !== 'transparent') ctx.fill()
+                    ctx.stroke()
+                } else {
+                    if (shape.fill && shape.fill !== 'transparent') ctx.fillRect(shape.x, shape.y, shape.width, shape.height)
+                    ctx.strokeRect(shape.x, shape.y, shape.width, shape.height)
+                }
                 break
             case 'circle':
                 ctx.beginPath()
@@ -189,6 +265,9 @@ export default class App {
                 ctx.lineTo(shape.endX, shape.endY)
                 ctx.stroke()
                 break
+            case 'arrow':
+                this._drawArrow(ctx, shape.startX, shape.startY, shape.endX, shape.endY)
+                break
             case 'path':
                 if (shape.points && shape.points.length > 1) {
                     ctx.beginPath()
@@ -200,7 +279,7 @@ export default class App {
                 }
                 break
             case 'text':
-                ctx.font = `${shape.fontSize || 16}px sans-serif`
+                ctx.font = `${shape.fontSize || 16}px ${shape.fontFamily || 'sans-serif'}`
                 ctx.fillStyle = shape.stroke || '#000'
                 ctx.fillText(shape.text || '', shape.x, shape.y)
                 break
@@ -220,27 +299,48 @@ export default class App {
         ctx.globalAlpha = 1
     }
 
+    _drawArrow(ctx, x1, y1, x2, y2) {
+        const headLength = 15
+        const dx = x2 - x1
+        const dy = y2 - y1
+        const angle = Math.atan2(dy, dx)
+        ctx.beginPath()
+        ctx.moveTo(x1, y1)
+        ctx.lineTo(x2, y2)
+        ctx.stroke()
+        ctx.beginPath()
+        ctx.moveTo(x2, y2)
+        ctx.lineTo(x2 - headLength * Math.cos(angle - Math.PI / 6), y2 - headLength * Math.sin(angle - Math.PI / 6))
+        ctx.moveTo(x2, y2)
+        ctx.lineTo(x2 - headLength * Math.cos(angle + Math.PI / 6), y2 - headLength * Math.sin(angle + Math.PI / 6))
+        ctx.stroke()
+    }
+
     _getShapeBounds(shape) {
         switch (shape.type) {
-            case 'rect': return { x: shape.x, y: shape.y, w: shape.width, h: shape.height }
-            case 'circle': return { x: shape.x - (shape.radius || 20), y: shape.y - (shape.radius || 20), w: (shape.radius || 20) * 2, h: (shape.radius || 20) * 2 }
-            case 'text': return { x: shape.x, y: shape.y - 20, w: 100, h: 24 }
-            default: return null
+            case 'rect':
+                return { x: shape.x, y: shape.y, w: shape.width, h: shape.height }
+            case 'circle':
+                return { x: shape.x - (shape.radius || 20), y: shape.y - (shape.radius || 20), w: (shape.radius || 20) * 2, h: (shape.radius || 20) * 2 }
+            case 'text':
+                return { x: shape.x, y: shape.y - 20, w: 100, h: 24 }
+            default:
+                return null
         }
     }
 
     _pushHistory() {
-        this.history.push(this.stateManager.getState())
+        this.history.push(this.state.getState())
     }
 
     _onToolSelect(tool) {
-        this.stateManager.setState({ activeTool: tool })
+        this.state.setState({ activeTool: tool })
     }
 
     _onPropertyChange(prop, val) {
-        const state = this.stateManager.getState()
+        const state = this.state.getState()
         if (['fill', 'stroke', 'strokeWidth', 'opacity', 'handDrawn', 'fontSize'].includes(prop)) {
-            this.stateManager.setState({ [prop]: val })
+            this.state.setState({ [prop]: val })
         }
         if (state.selectedIds.length > 0) {
             this._pushHistory()
@@ -250,60 +350,62 @@ export default class App {
                 }
                 return s
             })
-            this.stateManager.setState({ shapes })
+            this.state.setState({ shapes })
         }
     }
 
     _onLayerSelect(id) {
-        this.stateManager.setState({ selectedIds: [id] })
+        this.state.setState({ selectedIds: [id] })
     }
 
     _onToggleVisibility(id) {
-        const state = this.stateManager.getState()
+        const state = this.state.getState()
         const shapes = state.shapes.map(s => {
             if (s.id === id) return { ...s, visible: !s.visible }
             return s
         })
-        this.stateManager.setState({ shapes })
+        this.state.setState({ shapes })
     }
 
     _onToggleLock(id) {
-        const state = this.stateManager.getState()
+        const state = this.state.getState()
         const shapes = state.shapes.map(s => {
             if (s.id === id) return { ...s, locked: !s.locked }
             return s
         })
-        this.stateManager.setState({ shapes })
+        this.state.setState({ shapes })
     }
 
     _onDeleteShape(id) {
         this._pushHistory()
-        const state = this.stateManager.getState()
-        this.stateManager.setState({
+        const state = this.state.getState()
+        this.state.setState({
             shapes: state.shapes.filter(s => s.id !== id),
             selectedIds: state.selectedIds.filter(sid => sid !== id)
         })
     }
 
     _onAddLayer() {
-        const state = this.stateManager.getState()
+        const state = this.state.getState()
         const layerNum = state.layers.length + 1
-        this.stateManager.setState({
+        this.state.setState({
             layers: [...state.layers, { id: `layer-${layerNum}`, name: `Layer ${layerNum}`, visible: true, locked: false }]
         })
     }
 
     _onUndo() {
-        const prevState = this.history.undo()
+        const currentState = this.state.getState()
+        const prevState = this.history.undo(currentState)
         if (prevState) {
-            this.stateManager.setState(prevState)
+            this.state.setState(prevState)
         }
     }
 
     _onRedo() {
-        const nextState = this.history.redo()
+        const currentState = this.state.getState()
+        const nextState = this.history.redo(currentState)
         if (nextState) {
-            this.stateManager.setState(nextState)
+            this.state.setState(nextState)
         }
     }
 
@@ -320,7 +422,7 @@ export default class App {
     }
 
     _onZoomFit() {
-        const state = this.stateManager.getState()
+        const state = this.state.getState()
         let bounds = null
         if (state.shapes.length > 0) {
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -351,13 +453,72 @@ export default class App {
         console.log('Export as', format)
     }
 
+    _onResize() {
+        this._resizeCanvas()
+        this._updateMinimap()
+        this._drawCanvas()
+    }
+
     _onKeyDown(e) {
-        if (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) {
-            e.preventDefault()
-            this._onRedo()
-        } else if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+
+        if (this.toolManager?.activeTool?.handleKeyDown) {
+            this.toolManager.activeTool.handleKeyDown(e)
+        }
+
+        if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
             e.preventDefault()
             this._onUndo()
         }
+        if ((e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey) || (e.key === 'y' && (e.ctrlKey || e.metaKey))) {
+            e.preventDefault()
+            this._onRedo()
+        }
+        if (e.key === 's' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault()
+            this._saveProject()
+        }
+
+        const shortcuts = {
+            'v': 'select', 'p': 'pen', 'h': 'highlighter', 'e': 'eraser',
+            'r': 'rect', 'c': 'circle', 'l': 'line', 'a': 'arrow',
+            'd': 'diamond', 't': 'text'
+        }
+        if (shortcuts[e.key]) {
+            this.state.setState({ activeTool: shortcuts[e.key] })
+            this.toolbar.setActiveTool(shortcuts[e.key])
+        }
+        if (e.key === ' ') {
+            e.preventDefault()
+            this.canvas.style.cursor = 'grab'
+        }
+    }
+
+    _saveProject() {
+        const state = this.state.getState()
+        const name = prompt('Enter project name:', 'my-whiteboard')
+        if (name) {
+            this.storage.saveProject(name, state)
+            console.log('Project saved:', name)
+        }
+    }
+
+    _autoSave() {
+        this.storage.autoSave(this.state.getState())
+    }
+
+    _loadSavedState() {
+        const autoSaved = this.storage.loadAutoSave()
+        if (autoSaved) {
+            this.state.setState(autoSaved)
+        }
+    }
+
+    _startRenderLoop() {
+        const render = () => {
+            this._drawCanvas()
+            this.animationId = requestAnimationFrame(render)
+        }
+        render()
     }
 }
