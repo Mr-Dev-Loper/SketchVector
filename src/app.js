@@ -14,6 +14,10 @@ import Toolbar from './components/Toolbar.js'
 import PropertiesPanel from './components/PropertiesPanel.js'
 import LayersPanel from './components/LayersPanel.js'
 import Minimap from './components/Minimap.js'
+import { ThemeManager } from './utils/theme.js'
+import Grid from './utils/grid.js'
+import Exporter from './utils/export.js'
+import ContextMenu from './components/ContextMenu.js'
 
 export default class App {
     constructor() {
@@ -32,6 +36,9 @@ export default class App {
         this.animationId = null
         this.isPanning = false
         this.panStart = null
+        this.grid = null
+        this.contextMenu = null
+        this.clipboard = null
     }
 
     init() {
@@ -41,6 +48,8 @@ export default class App {
         this.history = new History()
         this.storage = new Storage()
         this.viewport = new Viewport()
+        this.grid = new Grid(this.viewport)
+        this.contextMenu = new ContextMenu(this)
 
         this._setupCanvas()
         this.renderer = new Renderer(this.canvas)
@@ -128,7 +137,10 @@ export default class App {
             this._updateMinimap()
         })
 
-        this.canvas.addEventListener('contextmenu', (e) => e.preventDefault())
+        this.canvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault()
+            this.contextMenu.show(e.clientX, e.clientY)
+        })
 
         this.canvas.addEventListener('mousedown', (e) => {
             if (e.button === 1 || (e.button === 0 && e.shiftKey && !this.toolManager.activeToolName?.includes('select'))) {
@@ -217,6 +229,8 @@ export default class App {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
         this.ctx.save()
         this.viewport.applyTransform(this.ctx)
+
+        this.grid.render(this.ctx, this.canvas.width, this.canvas.height)
 
         for (const shape of state.shapes) {
             if (shape.visible === false) continue
@@ -450,7 +464,67 @@ export default class App {
     }
 
     _onExport(format) {
-        console.log('Export as', format)
+        const state = this.state.getState()
+        switch (format) {
+            case 'png':
+                Exporter.exportToPNG(this.canvas, state.shapes, this.viewport)
+                break
+            case 'svg':
+                Exporter.exportToSVG(state.shapes, this.viewport)
+                break
+            case 'json':
+                Exporter.exportToJSON(state)
+                break
+        }
+    }
+
+    _cutShapes() {
+        this._copyShapes()
+        this._deleteSelected()
+    }
+
+    _copyShapes() {
+        const state = this.state.getState()
+        const selected = state.shapes.filter(s => state.selectedIds.includes(s.id))
+        this.clipboard = JSON.parse(JSON.stringify(selected))
+    }
+
+    _pasteShapes() {
+        if (!this.clipboard || this.clipboard.length === 0) return
+        this._pushHistory()
+        const state = this.state.getState()
+        const offset = 20
+        const newShapes = this.clipboard.map(s => ({
+            ...s,
+            id: `paste-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            x: (s.x || 0) + offset,
+            y: (s.y || 0) + offset,
+            startX: s.startX !== undefined ? s.startX + offset : undefined,
+            startY: s.startY !== undefined ? s.startY + offset : undefined,
+            endX: s.endX !== undefined ? s.endX + offset : undefined,
+            endY: s.endY !== undefined ? s.endY + offset : undefined
+        }))
+        this.state.setState({
+            shapes: [...state.shapes, ...newShapes],
+            selectedIds: newShapes.map(s => s.id)
+        })
+    }
+
+    _deleteSelected() {
+        const state = this.state.getState()
+        if (state.selectedIds.length === 0) return
+        this._pushHistory()
+        this.state.setState({
+            shapes: state.shapes.filter(s => !state.selectedIds.includes(s.id)),
+            selectedIds: []
+        })
+    }
+
+    _selectAll() {
+        const state = this.state.getState()
+        this.state.setState({
+            selectedIds: state.shapes.map(s => s.id)
+        })
     }
 
     _onResize() {
@@ -484,9 +558,20 @@ export default class App {
             'r': 'rect', 'c': 'circle', 'l': 'line', 'a': 'arrow',
             'd': 'diamond', 't': 'text'
         }
-        if (shortcuts[e.key]) {
+        if (shortcuts[e.key] && !e.ctrlKey && !e.metaKey) {
             this.state.setState({ activeTool: shortcuts[e.key] })
             this.toolbar.setActiveTool(shortcuts[e.key])
+        }
+
+        if (e.key === 'g' && !e.ctrlKey && !e.metaKey) {
+            this.grid.toggle()
+            this._drawCanvas()
+        }
+
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                this._deleteSelected()
+            }
         }
         if (e.key === ' ') {
             e.preventDefault()
