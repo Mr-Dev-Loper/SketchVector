@@ -1,197 +1,150 @@
 export default class TextTool {
-    constructor(toolManager) {
-        this.tm = toolManager
-        this.editingText = null
+    constructor(tm) {
+        this.tm = tm
+        this.isDrawing = false
+        this.startPos = null
+        this.preview = null
+        this.editingShape = null
         this.inputEl = null
     }
 
     handleMouseDown(pos, e) {
-        const state = this.tm.state.getState()
+        if (this.editingShape) { this._finalizeEdit(); return }
 
-        const existing = this._findTextAt(pos.x, pos.y, state.shapes)
-        if (existing) {
-            this._startEditing(existing)
-            return
-        }
+        const s = this.tm.state.getState()
+        const existing = this._findTextAt(pos.x, pos.y, s.shapes)
+        if (existing) { this._startEditing(existing); return }
 
-        this._createNewText(pos, state)
-    }
-
-    handleKeyDown(e) {
-        if (!this.editingText) return
-
-        if (e.key === 'Escape') {
-            this._cancelEdit()
-        } else if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            this._finalizeEdit()
-        }
-    }
-
-    _createNewText(pos, state) {
-        const textShape = {
+        this.startPos = { x: pos.x, y: pos.y }
+        this.preview = {
             type: 'text',
-            id: this._generateId(),
-            x: pos.x,
-            y: pos.y,
+            id: 's_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            x: pos.x, y: pos.y, width: 0, height: 0,
             text: '',
-            fontSize: state.fontSize || 16,
-            fontFamily: state.fontFamily || 'Arial',
-            stroke: state.colors.stroke,
-            fill: state.colors.fill,
+            fontSize: s.fontSize || 20,
+            fontFamily: s.fontFamily || "'Excalifont', Arial, sans-serif",
+            textAlign: s.textAlign || 'left',
+            stroke: s.stroke || '#1e1e1e',
+            fill: 'transparent',
             strokeWidth: 0,
-            opacity: state.opacity,
-            width: 200,
-            height: (state.fontSize || 16) * 1.4
+            opacity: s.opacity !== undefined ? s.opacity : 1,
+        }
+        this.isDrawing = true
+    }
+
+    handleMouseMove(pos, e) {
+        if (!this.isDrawing || !this.preview) return
+        const p = this.preview
+        p.x = Math.min(this.startPos.x, pos.x)
+        p.y = Math.min(this.startPos.y, pos.y)
+        p.width = Math.abs(pos.x - this.startPos.x)
+        p.height = Math.abs(pos.y - this.startPos.y)
+        this.tm.redraw()
+    }
+
+    handleMouseUp(pos, e) {
+        if (!this.isDrawing || !this.preview) return
+        this.isDrawing = false
+        const p = this.preview
+
+        if (p.width < 10 && p.height < 10) {
+            p.width = 150
+            p.height = (p.fontSize || 20) * 1.4
+            p.x = this.startPos.x
+            p.y = this.startPos.y
         }
 
         this.tm.pushHistory()
-        this.tm.state.setState({
-            shapes: [...state.shapes, textShape]
-        })
-
-        this._startEditing(textShape)
+        const s = this.tm.state.getState()
+        this.tm.state.setState({ shapes: [...s.shapes, p] })
+        this.preview = null
+        this.tm.redraw()
+        this._startEditing(p)
     }
 
-    _startEditing(textShape) {
+    _startEditing(shape) {
         this._removeInput()
-        this.editingText = textShape
-
+        this.editingShape = shape
         const vp = this.tm.viewport
-        const screenPos = vp ? vp.worldToScreen(textShape.x, textShape.y) : { x: textShape.x, y: textShape.y }
-        const zoom = vp ? vp.zoom : 1
+        const sp = vp.worldToScreen(shape.x, shape.y)
+        const zoom = vp.zoomLevel
 
-        const input = document.createElement('textarea')
-        input.className = 'text-tool-input'
-        input.value = textShape.text || ''
-        input.style.cssText = `
-            position: fixed;
-            left: ${screenPos.x}px;
-            top: ${screenPos.y - (textShape.fontSize || 16) * zoom}px;
-            font-size: ${(textShape.fontSize || 16) * zoom}px;
-            font-family: ${textShape.fontFamily || 'Arial'};
-            color: ${textShape.stroke || '#000'};
-            background: transparent;
-            border: 1px dashed #4a86e8;
-            outline: none;
-            resize: none;
-            min-width: 100px;
-            min-height: ${(textShape.fontSize || 16) * zoom * 1.5}px;
-            padding: 2px 4px;
-            z-index: 10000;
-            line-height: 1.4;
-            overflow: hidden;
-        `
+        const ta = document.createElement('textarea')
+        ta.className = 'text-input-overlay'
+        ta.value = shape.text || ''
+        ta.style.left = sp.x + 'px'
+        ta.style.top = sp.y + 'px'
+        ta.style.width = Math.max((shape.width || 150) * zoom, 60) + 'px'
+        ta.style.minHeight = Math.max((shape.height || 30) * zoom, 30) + 'px'
+        ta.style.fontSize = (shape.fontSize || 20) * zoom + 'px'
+        ta.style.fontFamily = shape.fontFamily || 'Arial'
+        ta.style.color = shape.stroke || '#1e1e1e'
+        ta.style.textAlign = shape.textAlign || 'left'
 
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this._cancelEdit()
-            } else if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                this._finalizeEdit()
-            }
+        ta.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') this._finalizeEdit()
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this._finalizeEdit() }
             e.stopPropagation()
         })
-
-        input.addEventListener('input', () => {
-            this._autoResizeInput(input)
+        ta.addEventListener('blur', () => { setTimeout(() => this._finalizeEdit(), 100) })
+        ta.addEventListener('input', () => {
+            ta.style.height = 'auto'
+            ta.style.height = ta.scrollHeight + 'px'
         })
 
-        document.body.appendChild(input)
-        this.inputEl = input
-        input.focus()
-        input.select()
-        this._autoResizeInput(input)
-    }
-
-    _autoResizeInput(input) {
-        input.style.height = 'auto'
-        input.style.height = input.scrollHeight + 'px'
+        document.getElementById('text-input-container').appendChild(ta)
+        this.inputEl = ta
+        ta.focus()
+        ta.style.height = 'auto'
+        ta.style.height = ta.scrollHeight + 'px'
     }
 
     _finalizeEdit() {
-        if (!this.editingText || !this.inputEl) return
+        if (!this.editingShape || !this.inputEl) return
+        const text = this.inputEl.value
+        const s = this.tm.state.getState()
 
-        const text = this.inputEl.value.trim()
-        if (!text) {
-            this._removeText(this.editingText.id)
-        } else {
-            this._updateTextContent(this.editingText, text)
-        }
-
-        this._removeInput()
-        this.editingText = null
-    }
-
-    _cancelEdit() {
-        if (this.editingText && !this.editingText.text) {
-            this._removeText(this.editingText.id)
-        }
-        this._removeInput()
-        this.editingText = null
-    }
-
-    _updateTextContent(textShape, content) {
-        const state = this.tm.state.getState()
         this.tm.pushHistory()
-
         const ctx = this.tm.getCtx()
-        if (ctx) {
-            ctx.font = `${textShape.fontSize || 16}px ${textShape.fontFamily || 'Arial'}`
-            textShape.width = Math.max(ctx.measureText(content).width + 10, 50)
+        let width = this.editingShape.width || 150
+        if (ctx && text) {
+            ctx.font = `${this.editingShape.fontSize || 20}px ${this.editingShape.fontFamily || 'Arial'}`
+            width = Math.max(ctx.measureText(text).width + 10, 50)
         }
 
-        const shapes = state.shapes.map(s => {
-            if (s.id === textShape.id) {
-                return { ...s, text: content, width: textShape.width }
-            }
-            return s
-        })
-        this.tm.state.setState({ shapes })
-    }
+        if (!text.trim()) {
+            this.tm.state.setState({ shapes: s.shapes.filter(sh => sh.id !== this.editingShape.id) })
+        } else {
+            this.tm.state.setState({
+                shapes: s.shapes.map(sh => sh.id === this.editingShape.id ? { ...sh, text, width } : sh)
+            })
+        }
 
-    _removeText(id) {
-        const state = this.tm.state.getState()
-        this.tm.pushHistory()
-        this.tm.state.setState({
-            shapes: state.shapes.filter(s => s.id !== id)
-        })
+        this._removeInput()
+        this.editingShape = null
+        this.tm.redraw()
     }
 
     _findTextAt(x, y, shapes) {
         for (let i = shapes.length - 1; i >= 0; i--) {
             const s = shapes[i]
             if (s.type === 'text') {
-                const w = s.width || 200
-                const h = (s.fontSize || 16) * 1.4
-                if (x >= s.x && x <= s.x + w && y >= s.y - h && y <= s.y + 4) {
-                    return s
-                }
+                const w = s.width || 100, h = (s.fontSize || 20) * 1.4
+                if (x >= s.x && x <= s.x + w && y >= s.y && y <= s.y + h) return s
             }
         }
         return null
     }
 
     _removeInput() {
-        if (this.inputEl && this.inputEl.parentNode) {
-            this.inputEl.parentNode.removeChild(this.inputEl)
-        }
+        if (this.inputEl?.parentNode) this.inputEl.parentNode.removeChild(this.inputEl)
         this.inputEl = null
     }
 
-    _generateId() {
-        return 'shape_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+    handleKeyDown(e) {
+        if (this.editingShape && e.key === 'Escape') this._finalizeEdit()
     }
 
-    activate() {
-        if (this.tm.canvas) this.tm.canvas.style.cursor = 'text'
-    }
-
-    deactivate() {
-        if (this.editingText) {
-            this._finalizeEdit()
-        }
-        this._removeInput()
-        this.editingText = null
-    }
+    activate() { this.tm.canvas.style.cursor = 'crosshair' }
+    deactivate() { if (this.editingShape) this._finalizeEdit(); this._removeInput(); this.isDrawing = false; this.preview = null }
 }
