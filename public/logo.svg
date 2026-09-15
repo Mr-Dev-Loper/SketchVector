@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" width="200" height="48">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6c5ce7"/>
+      <stop offset="100%" style="stop-color:#a29bfe"/>
+    </linearGradient>
+  </defs>
+  <!-- Pen nib icon -->
+  <g transform="translate(4, 4) scale(0.65)">
+    <path d="M20 4L4 20l6 6 16-16z" fill="url(#grad)"/>
+    <path d="M20 4l4-4 4 4-4 4z" fill="#6c5ce7"/>
+    <path d="M10 26l-6 6 4 2 6-6z" fill="#a29bfe"/>
+    <circle cx="28" cy="8" r="2" fill="#6c5ce7"/>
+  </g>
+  <!-- Text -->
+  <text x="38" y="32" font-family="'Excalifont', 'Comic Sans MS', cursive, sans-serif" font-size="28" font-weight="700" fill="#1e1e1e">
+    Sketch<tspan fill="#6c5ce7">Vector</tspan>
+  </text>
+</svg>

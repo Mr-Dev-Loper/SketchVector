@@ -12,7 +12,7 @@ const TOOLS = [
 ]
 
 const ICONS = {
-    hand: `<svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0v1M14 10V4a2 2 0 0 0-4 0v6M10 9.5V5a2 2 0 0 0-4 0v9"/><path d="M18 11a2 2 0 0 1 4 0v3a8 8 0 0 1-8 8h-2c-2.5 0-4-.5-5.5-2L3.5 15a1.5 1.5 0 0 1 2-2L8 15"/><path d="M14 11.5V9a2 2 0 0 0-4 0"/></svg>`,
+    hand: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0"/><path d="M14 10V4a2 2 0 0 0-4 0v7"/><path d="M10 10V5a2 2 0 0 0-4 0v9"/><path d="M18 11a2 2 0 0 1 4 0v2a8 8 0 0 1-8 8h-2c-2 0-4-.5-5.5-2L4 16a1.5 1.5 0 0 1 2-2l3 2"/></svg>`,
     select: `<svg viewBox="0 0 24 24"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>`,
     rect: `<svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>`,
     diamond: `<svg viewBox="0 0 24 24"><path d="M12 2l10 10-10 10L2 12z"/></svg>`,

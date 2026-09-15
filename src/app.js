@@ -397,7 +397,9 @@ export default class App {
             e.preventDefault()
             const pos = this.viewport.screenToWorld(e.clientX, e.clientY)
             const s = this.state.getState()
-            const hit = this.toolManager.getActiveTool()?._findAt?.(pos.x, pos.y, s) || this.toolManager.getActiveTool()?._findAt?.(pos.x, pos.y, { shapes: s.shapes }) || null
+            const tool = this.toolManager.activeTool
+            let hit = null
+            if (tool && tool._findAt) hit = tool._findAt(pos.x, pos.y, s)
             if (hit && !s.selectedIds.includes(hit.id)) {
                 this.state.setState({ selectedIds: [hit.id] })
                 this._drawCanvas()
