@@ -1,214 +1,178 @@
 export default class Renderer {
     constructor(canvas) {
-        this.canvas = canvas;
-        this.ctx = canvas.getContext('2d');
-        this.gridVisible = true;
-        this.gridSize = 20;
+        this.canvas = canvas
+        this.ctx = canvas.getContext('2d')
     }
 
-    clear() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
+    renderGrid(viewport, screenW, screenH) {
+        const ctx = this.ctx
+        const zoom = viewport.zoomLevel
+        const gridSize = 20
 
-    renderAll(shapes, viewport) {
-        this.ctx.save();
-        viewport.applyTransform(this.ctx);
+        const startX = Math.floor(-viewport.x / zoom / gridSize) * gridSize - gridSize
+        const startY = Math.floor(-viewport.y / zoom / gridSize) * gridSize - gridSize
+        const endX = startX + screenW / zoom + gridSize * 2
+        const endY = startY + screenH / zoom + gridSize * 2
 
-        if (this.gridVisible) {
-            this.renderGrid(viewport);
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+        ctx.fillStyle = isDark ? '#333' : '#ddd'
+
+        const step = gridSize
+        const dotSize = 1.2 / zoom
+
+        for (let x = startX; x <= endX; x += step) {
+            for (let y = startY; y <= endY; y += step) {
+                ctx.beginPath()
+                ctx.arc(x, y, dotSize, 0, Math.PI * 2)
+                ctx.fill()
+            }
         }
-
-        for (const shape of shapes) {
-            this.renderShape(shape);
-        }
-
-        this.ctx.restore();
-    }
-
-    renderGrid(viewport) {
-        const gridSize = this.gridSize;
-        const ctx = this.ctx;
-
-        const startX = Math.floor(-viewport.x / viewport.zoomLevel / gridSize) * gridSize - gridSize;
-        const startY = Math.floor(-viewport.y / viewport.zoomLevel / gridSize) * gridSize - gridSize;
-        const endX = startX + this.canvas.width / viewport.zoomLevel + gridSize * 2;
-        const endY = startY + this.canvas.height / viewport.zoomLevel + gridSize * 2;
-
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 0.5;
-
-        ctx.beginPath();
-        for (let x = startX; x <= endX; x += gridSize) {
-            ctx.moveTo(x, startY);
-            ctx.lineTo(x, endY);
-        }
-        for (let y = startY; y <= endY; y += gridSize) {
-            ctx.moveTo(startX, y);
-            ctx.lineTo(endX, y);
-        }
-        ctx.stroke();
     }
 
     renderShape(shape) {
-        const ctx = this.ctx;
-        ctx.save();
+        const ctx = this.ctx
+        ctx.save()
+        if (shape.opacity !== undefined) ctx.globalAlpha = shape.opacity
+        ctx.fillStyle = shape.fill || 'transparent'
+        ctx.strokeStyle = shape.stroke || '#1e1e1e'
+        ctx.lineWidth = shape.strokeWidth || 2
+        ctx.lineCap = 'round'
+        ctx.lineJoin = 'round'
 
-        if (shape.opacity !== undefined) {
-            ctx.globalAlpha = shape.opacity;
-        }
-
-        if (shape.rotation) {
-            const cx = shape.x + (shape.width || 0) / 2;
-            const cy = shape.y + (shape.height || 0) / 2;
-            ctx.translate(cx, cy);
-            ctx.rotate((shape.rotation * Math.PI) / 180);
-            ctx.translate(-cx, -cy);
-        }
-
-        ctx.fillStyle = shape.fill || 'transparent';
-        ctx.strokeStyle = shape.stroke || '#000000';
-        ctx.lineWidth = shape.strokeWidth || 2;
+        this._applyStrokeStyle(shape)
 
         switch (shape.type) {
-            case 'rect':
-                this.renderRect(shape);
-                break;
-            case 'circle':
-                this.renderCircle(shape);
-                break;
-            case 'line':
-                this.renderLine(shape);
-                break;
-            case 'arrow':
-                this.renderArrow(shape);
-                break;
-            case 'path':
-                this.renderPath(shape);
-                break;
-            case 'text':
-                this.renderText(shape);
-                break;
+            case 'rect': this._rect(shape); break
+            case 'circle': this._circle(shape); break
+            case 'line': this._line(shape); break
+            case 'arrow': this._arrow(shape); break
+            case 'path': this._path(shape); break
+            case 'text': this._text(shape); break
         }
-
-        ctx.restore();
+        ctx.restore()
     }
 
-    renderRect(shape) {
-        const ctx = this.ctx;
-        ctx.beginPath();
-        ctx.rect(shape.x, shape.y, shape.width, shape.height);
-
-        if (shape.fill && shape.fill !== 'transparent') {
-            ctx.fill();
-        }
-        ctx.stroke();
+    renderShapeTo(ctx, shape) {
+        const prev = this.ctx
+        this.ctx = ctx
+        this.renderShape(shape)
+        this.ctx = prev
     }
 
-    renderCircle(shape) {
-        const ctx = this.ctx;
-        ctx.beginPath();
-        ctx.arc(shape.x, shape.y, shape.radius, 0, Math.PI * 2);
-
-        if (shape.fill && shape.fill !== 'transparent') {
-            ctx.fill();
-        }
-        ctx.stroke();
+    _applyStrokeStyle(shape) {
+        const ctx = this.ctx
+        const style = shape.strokeStyle || 'solid'
+        if (style === 'dashed') ctx.setLineDash([8, 4])
+        else if (style === 'dotted') ctx.setLineDash([2, 4])
+        else ctx.setLineDash([])
     }
 
-    renderLine(shape) {
-        const ctx = this.ctx;
-        ctx.beginPath();
-        ctx.moveTo(shape.startX, shape.startY);
-        ctx.lineTo(shape.endX, shape.endY);
-        ctx.stroke();
+    _roundRect(x, y, w, h, r) {
+        const ctx = this.ctx
+        ctx.beginPath()
+        ctx.moveTo(x + r, y)
+        ctx.lineTo(x + w - r, y)
+        ctx.arcTo(x + w, y, x + w, y + r, r)
+        ctx.lineTo(x + w, y + h - r)
+        ctx.arcTo(x + w, y + h, x + w - r, y + h, r)
+        ctx.lineTo(x + r, y + h)
+        ctx.arcTo(x, y + h, x, y + h - r, r)
+        ctx.lineTo(x, y + r)
+        ctx.arcTo(x, y, x + r, y, r)
+        ctx.closePath()
     }
 
-    renderArrow(shape) {
-        const ctx = this.ctx;
-        const headLength = 15;
-        const dx = shape.endX - shape.startX;
-        const dy = shape.endY - shape.startY;
-        const angle = Math.atan2(dy, dx);
-
-        ctx.beginPath();
-        ctx.moveTo(shape.startX, shape.startY);
-        ctx.lineTo(shape.endX, shape.endY);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(shape.endX, shape.endY);
-        ctx.lineTo(
-            shape.endX - headLength * Math.cos(angle - Math.PI / 6),
-            shape.endY - headLength * Math.sin(angle - Math.PI / 6)
-        );
-        ctx.moveTo(shape.endX, shape.endY);
-        ctx.lineTo(
-            shape.endX - headLength * Math.cos(angle + Math.PI / 6),
-            shape.endY - headLength * Math.sin(angle + Math.PI / 6)
-        );
-        ctx.stroke();
-    }
-
-    renderPath(shape) {
-        const ctx = this.ctx;
-        const points = shape.points;
-
-        if (!points || points.length < 2) return;
-
-        ctx.beginPath();
-
-        if (shape.handDrawn) {
-            this.renderHandDrawnPath(points);
+    _rect(s) {
+        const ctx = this.ctx
+        if (s.isDiamond) {
+            const cx = s.x + (s.width || 0) / 2, cy = s.y + (s.height || 0) / 2
+            ctx.beginPath()
+            ctx.moveTo(cx, s.y)
+            ctx.lineTo(s.x + (s.width || 0), cy)
+            ctx.lineTo(cx, s.y + (s.height || 0))
+            ctx.lineTo(s.x, cy)
+            ctx.closePath()
+            if (s.fill && s.fill !== 'transparent') ctx.fill()
+            ctx.stroke()
         } else {
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(points[i].x, points[i].y);
+            const rx = s.edges === 'round' ? Math.min(12, (s.width || 0) / 4, (s.height || 0) / 4) : 0
+            if (rx > 0) {
+                this._roundRect(s.x, s.y, s.width || 0, s.height || 0, rx)
+            } else {
+                ctx.beginPath()
+                ctx.rect(s.x, s.y, s.width || 0, s.height || 0)
             }
-            ctx.stroke();
+            if (s.fill && s.fill !== 'transparent') ctx.fill()
+            ctx.stroke()
         }
     }
 
-    renderHandDrawnPath(points) {
-        const ctx = this.ctx;
-        ctx.moveTo(points[0].x, points[0].y);
+    _circle(s) {
+        const ctx = this.ctx
+        ctx.beginPath()
+        ctx.arc(s.x, s.y, s.radius || 20, 0, Math.PI * 2)
+        if (s.fill && s.fill !== 'transparent') ctx.fill()
+        ctx.stroke()
+    }
 
-        for (let i = 1; i < points.length; i++) {
-            const prev = points[i - 1];
-            const curr = points[i];
+    _line(s) {
+        const ctx = this.ctx
+        ctx.beginPath()
+        ctx.moveTo(s.startX, s.startY)
+        ctx.lineTo(s.endX, s.endY)
+        ctx.stroke()
+    }
 
-            const midX = (prev.x + curr.x) / 2;
-            const midY = (prev.y + curr.y) / 2;
+    _arrow(s) {
+        const ctx = this.ctx
+        const headLen = 14
+        const dx = s.endX - s.startX, dy = s.endY - s.startY
+        const angle = Math.atan2(dy, dx)
 
-            const jitterX = (Math.random() - 0.5) * 2;
-            const jitterY = (Math.random() - 0.5) * 2;
+        ctx.beginPath()
+        ctx.moveTo(s.startX, s.startY)
+        ctx.lineTo(s.endX, s.endY)
+        ctx.stroke()
 
-            ctx.quadraticCurveTo(
-                prev.x + jitterX,
-                prev.y + jitterY,
-                midX,
-                midY
-            );
+        ctx.beginPath()
+        ctx.moveTo(s.endX, s.endY)
+        ctx.lineTo(s.endX - headLen * Math.cos(angle - Math.PI / 6), s.endY - headLen * Math.sin(angle - Math.PI / 6))
+        ctx.moveTo(s.endX, s.endY)
+        ctx.lineTo(s.endX - headLen * Math.cos(angle + Math.PI / 6), s.endY - headLen * Math.sin(angle + Math.PI / 6))
+        ctx.stroke()
+    }
+
+    _path(s) {
+        const pts = s.points
+        if (!pts || pts.length < 2) return
+        const ctx = this.ctx
+        ctx.beginPath()
+        ctx.moveTo(pts[0].x, pts[0].y)
+        for (let i = 1; i < pts.length; i++) {
+            if (i < pts.length - 1) {
+                const mx = (pts[i].x + pts[i + 1].x) / 2
+                const my = (pts[i].y + pts[i + 1].y) / 2
+                ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my)
+            } else {
+                ctx.lineTo(pts[i].x, pts[i].y)
+            }
         }
-
-        ctx.stroke();
+        ctx.stroke()
     }
 
-    renderText(shape) {
-        const ctx = this.ctx;
-        ctx.font = `${shape.fontSize || 16}px ${shape.fontFamily || 'Arial'}`;
-        ctx.textBaseline = 'top';
-
-        if (shape.fill && shape.fill !== 'transparent') {
-            ctx.fillText(shape.text || '', shape.x, shape.y);
+    _text(s) {
+        const ctx = this.ctx
+        ctx.font = `${s.fontSize || 20}px ${s.fontFamily || 'Arial'}`
+        ctx.textBaseline = 'top'
+        ctx.textAlign = s.textAlign || 'left'
+        ctx.fillStyle = s.stroke || '#1e1e1e'
+        const text = s.text || ''
+        if (s.textAlign === 'center') {
+            ctx.fillText(text, s.x + (s.width || 0) / 2, s.y - (s.fontSize || 20))
+        } else if (s.textAlign === 'right') {
+            ctx.fillText(text, s.x + (s.width || 0), s.y - (s.fontSize || 20))
+        } else {
+            ctx.fillText(text, s.x, s.y - (s.fontSize || 20))
         }
-        ctx.strokeText(shape.text || '', shape.x, shape.y);
-    }
-
-    setGridVisible(visible) {
-        this.gridVisible = visible;
-    }
-
-    setGridSize(size) {
-        this.gridSize = size;
     }
 }
