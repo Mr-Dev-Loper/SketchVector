@@ -1,32 +1,48 @@
 export default class SelectionTool {
-    constructor(toolManager) {
-        this.tm = toolManager
+    constructor(tm) {
+        this.tm = tm
         this.mode = 'idle'
         this.dragStart = null
         this.dragShapeIds = null
         this.marquee = null
-        this.originalShapes = []
+        this.origShapes = null
+        this.resizeHandle = null
+        this.resizeShape = null
+        this.resizeStart = null
     }
 
     handleMouseDown(pos, e) {
-        const state = this.tm.state.getState()
-        this.originalShapes = state.shapes.map(s => ({ ...s, points: s.points ? s.points.map(p => ({ ...p })) : undefined }))
+        const s = this.tm.state.getState()
+        this.origShapes = JSON.parse(JSON.stringify(s.shapes))
 
-        const hit = this._findShapeAt(pos.x, pos.y, state)
+        if (s.selectedIds.length === 1) {
+            const shape = s.shapes.find(sh => sh.id === s.selectedIds[0])
+            if (shape) {
+                const handle = this._hitHandle(pos.x, pos.y, shape)
+                if (handle) {
+                    this.mode = 'resizing'
+                    this.resizeHandle = handle
+                    this.resizeShape = shape
+                    this.resizeStart = { x: pos.x, y: pos.y }
+                    this.tm.redraw()
+                    return
+                }
+            }
+        }
+
+        const hit = this._findAt(pos.x, pos.y, s)
         if (hit) {
             if (e.shiftKey) {
-                const newIds = state.selectedIds.includes(hit.id)
-                    ? state.selectedIds.filter(id => id !== hit.id)
-                    : [...state.selectedIds, hit.id]
-                this.tm.state.setState({ selectedIds: newIds })
+                const ids = s.selectedIds.includes(hit.id)
+                    ? s.selectedIds.filter(id => id !== hit.id)
+                    : [...s.selectedIds, hit.id]
+                this.tm.state.setState({ selectedIds: ids })
             } else {
-                if (!state.selectedIds.includes(hit.id)) {
-                    this.tm.state.setState({ selectedIds: [hit.id] })
-                }
+                if (!s.selectedIds.includes(hit.id)) this.tm.state.setState({ selectedIds: [hit.id] })
             }
             this.mode = 'dragging'
             this.dragStart = { x: pos.x, y: pos.y }
-            this.dragShapeIds = state.selectedIds.includes(hit.id) ? [...state.selectedIds] : [hit.id]
+            this.dragShapeIds = [...this.tm.state.getState().selectedIds]
         } else {
             this.tm.state.setState({ selectedIds: [] })
             this.mode = 'marquee'
@@ -35,294 +51,246 @@ export default class SelectionTool {
     }
 
     handleMouseMove(pos, e) {
-        if (this.mode === 'dragging' && this.dragShapeIds) {
-            const state = this.tm.state.getState()
-            const dx = pos.x - this.dragStart.x
-            const dy = pos.y - this.dragStart.y
+        if (this.mode === 'resizing' && this.resizeShape && this.resizeHandle) {
+            const dx = pos.x - this.resizeStart.x
+            const dy = pos.y - this.resizeStart.y
+            const shape = this.resizeShape
+            const h = this.resizeHandle
+            const s = this.tm.state.getState()
 
-            const shapes = state.shapes.map(s => {
-                if (this.dragShapeIds.includes(s.id)) {
-                    return this._moveShape(s, dx, dy)
-                }
-                return s
+            this.tm.state.setState({
+                shapes: s.shapes.map(sh => {
+                    if (sh.id !== shape.id) return sh
+                    return this._resize(sh, h, dx, dy)
+                })
             })
-            this.tm.state.setState({ shapes })
+            this.resizeStart = { x: pos.x, y: pos.y }
+            this.tm.redraw()
+        } else if (this.mode === 'dragging' && this.dragShapeIds) {
+            const dx = pos.x - this.dragStart.x, dy = pos.y - this.dragStart.y
+            const s = this.tm.state.getState()
+            this.tm.state.setState({
+                shapes: s.shapes.map(sh => this.dragShapeIds.includes(sh.id) ? this._move(sh, dx, dy) : sh)
+            })
             this.dragStart = { x: pos.x, y: pos.y }
+            this.tm.redraw()
         } else if (this.mode === 'marquee') {
-            const x = Math.min(this.dragStart.x, pos.x)
-            const y = Math.min(this.dragStart.y, pos.y)
-            const w = Math.abs(pos.x - this.dragStart.x)
-            const h = Math.abs(pos.y - this.dragStart.y)
-            this.marquee = { x, y, w, h }
+            this.marquee = {
+                x: Math.min(this.dragStart.x, pos.x),
+                y: Math.min(this.dragStart.y, pos.y),
+                w: Math.abs(pos.x - this.dragStart.x),
+                h: Math.abs(pos.y - this.dragStart.y)
+            }
+            this.tm.redraw()
         }
     }
 
     handleMouseUp(pos, e) {
-        if (this.mode === 'dragging') {
-            const current = this.tm.state.getState().shapes
-            const changed = current.some((s, i) => {
-                const orig = this.originalShapes.find(o => o.id === s.id)
-                return orig && JSON.stringify(s) !== JSON.stringify(orig)
-            })
-            if (changed) {
-                this.tm.pushHistory()
-            }
+        if (this.mode === 'resizing') {
+            const curr = this.tm.state.getState().shapes
+            const changed = JSON.stringify(curr) !== JSON.stringify(this.origShapes)
+            if (changed) this.tm.pushHistory()
+        } else if (this.mode === 'dragging') {
+            const curr = this.tm.state.getState().shapes
+            const changed = JSON.stringify(curr) !== JSON.stringify(this.origShapes)
+            if (changed) this.tm.pushHistory()
         } else if (this.mode === 'marquee' && this.marquee) {
-            const state = this.tm.state.getState()
+            const s = this.tm.state.getState()
             const selected = []
-
-            for (const shape of state.shapes) {
-                if (shape.visible === false || shape.locked) continue
-                const bounds = this._getShapeBounds(shape)
-                if (bounds && this._boundsOverlap(this.marquee, bounds)) {
-                    selected.push(shape.id)
-                }
+            for (const sh of s.shapes) {
+                if (sh.visible === false || sh.locked) continue
+                const b = this._bounds(sh)
+                if (b && this._overlap(this.marquee, b)) selected.push(sh.id)
             }
-
             if (e.shiftKey) {
-                const existing = new Set(state.selectedIds)
-                for (const id of selected) {
-                    if (existing.has(id)) existing.delete(id)
-                    else existing.add(id)
-                }
-                this.tm.state.setState({ selectedIds: [...existing] })
+                const ids = new Set(s.selectedIds)
+                selected.forEach(id => ids.has(id) ? ids.delete(id) : ids.add(id))
+                this.tm.state.setState({ selectedIds: [...ids] })
             } else {
                 this.tm.state.setState({ selectedIds: selected })
             }
-
             this.marquee = null
         }
-
         this.mode = 'idle'
         this.dragStart = null
-        this.dragShapeIds = null
+        this.resizeHandle = null
+        this.resizeShape = null
+        this.tm.redraw()
     }
 
     handleKeyDown(e) {
-        const state = this.tm.state.getState()
-
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-            if (state.selectedIds.length > 0) {
-                e.preventDefault()
-                this._deleteSelected(state)
-            }
-        }
-
-        if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
+        const s = this.tm.state.getState()
+        if ((e.key === 'Delete' || e.key === 'Backspace') && s.selectedIds.length) {
             e.preventDefault()
-            this._selectAll(state)
+            this.tm.pushHistory()
+            this.tm.state.setState({ shapes: s.shapes.filter(sh => !s.selectedIds.includes(sh.id)), selectedIds: [] })
+            this.tm.redraw()
         }
-
-        if (e.key === 'Escape') {
-            this.tm.state.setState({ selectedIds: [] })
-        }
-
-        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && state.selectedIds.length > 0) {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && s.selectedIds.length) {
             e.preventDefault()
-            this._nudgeSelected(e.key, e.shiftKey ? 10 : 1, state)
+            const amt = e.shiftKey ? 10 : 1
+            this.tm.pushHistory()
+            this.tm.state.setState({
+                shapes: s.shapes.map(sh => {
+                    if (!s.selectedIds.includes(sh.id)) return sh
+                    return this._move(sh, e.key === 'ArrowRight' ? amt : e.key === 'ArrowLeft' ? -amt : 0, e.key === 'ArrowDown' ? amt : e.key === 'ArrowUp' ? -amt : 0)
+                })
+            })
+            this.tm.redraw()
         }
     }
 
-    _findShapeAt(x, y, state) {
-        for (let i = state.shapes.length - 1; i >= 0; i--) {
-            const s = state.shapes[i]
-            if (s.visible === false || s.locked) continue
-            if (this._pointInShape(x, y, s)) return s
-        }
-        return null
-    }
-
-    _pointInShape(x, y, shape) {
-        const margin = 5 / (this.tm.viewport ? this.tm.viewport.zoomLevel : 1)
-        switch (shape.type) {
-            case 'rect':
-                if (shape.isDiamond) {
-                    const cx = shape.x + shape.width / 2
-                    const cy = shape.y + shape.height / 2
-                    const dx = Math.abs(x - cx)
-                    const dy = Math.abs(y - cy)
-                    return (dx / (shape.width / 2) + dy / (shape.height / 2)) <= 1 + margin / shape.width
-                }
-                return (
-                    x >= shape.x - margin && x <= shape.x + shape.width + margin &&
-                    y >= shape.y - margin && y <= shape.y + shape.height + margin
-                )
-            case 'circle': {
-                const dx = x - shape.x
-                const dy = y - shape.y
-                return Math.sqrt(dx * dx + dy * dy) <= shape.radius + margin
-            }
-            case 'line':
-            case 'arrow': {
-                const A = x - shape.startX
-                const B = y - shape.startY
-                const C = shape.endX - shape.startX
-                const D = shape.endY - shape.startY
-                const dot = A * C + B * D
-                const lenSq = C * C + D * D
-                let t = lenSq !== 0 ? dot / lenSq : -1
-                t = Math.max(0, Math.min(1, t))
-                const nearX = shape.startX + t * C
-                const nearY = shape.startY + t * D
-                const dist = Math.sqrt((x - nearX) ** 2 + (y - nearY) ** 2)
-                return dist < margin
-            }
-            case 'path':
-                if (shape.points && shape.points.length > 1) {
-                    for (let i = 0; i < shape.points.length - 1; i++) {
-                        const A = x - shape.points[i].x
-                        const B = y - shape.points[i].y
-                        const C = shape.points[i + 1].x - shape.points[i].x
-                        const D = shape.points[i + 1].y - shape.points[i].y
-                        const dot = A * C + B * D
-                        const lenSq = C * C + D * D
-                        let t = lenSq !== 0 ? dot / lenSq : -1
-                        t = Math.max(0, Math.min(1, t))
-                        const nearX = shape.points[i].x + t * C
-                        const nearY = shape.points[i].y + t * D
-                        const dist = Math.sqrt((x - nearX) ** 2 + (y - nearY) ** 2)
-                        if (dist < margin) return true
-                    }
-                }
-                return false
-            case 'text': {
-                const w = shape.width || 200
-                const h = (shape.fontSize || 16) * 1.4
-                return (
-                    x >= shape.x - margin && x <= shape.x + w + margin &&
-                    y >= shape.y - h - margin && y <= shape.y + 4 + margin
-                )
-            }
-            default:
-                return false
-        }
-    }
-
-    _getShapeBounds(shape) {
-        const m = 6
-        switch (shape.type) {
-            case 'rect':
-                return { x: shape.x - m, y: shape.y - m, w: shape.width + m * 2, h: shape.height + m * 2 }
-            case 'circle':
-                return { x: shape.x - shape.radius - m, y: shape.y - shape.radius - m, w: shape.radius * 2 + m * 2, h: shape.radius * 2 + m * 2 }
-            case 'line':
-            case 'arrow': {
-                const minX = Math.min(shape.startX, shape.endX)
-                const minY = Math.min(shape.startY, shape.endY)
-                const maxX = Math.max(shape.startX, shape.endX)
-                const maxY = Math.max(shape.startY, shape.endY)
-                return { x: minX - m, y: minY - m, w: maxX - minX + m * 2, h: maxY - minY + m * 2 }
-            }
-            case 'path': {
-                if (!shape.points || shape.points.length === 0) return null
-                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-                for (const p of shape.points) {
-                    minX = Math.min(minX, p.x)
-                    minY = Math.min(minY, p.y)
-                    maxX = Math.max(maxX, p.x)
-                    maxY = Math.max(maxY, p.y)
-                }
-                return { x: minX - m, y: minY - m, w: maxX - minX + m * 2, h: maxY - minY + m * 2 }
-            }
-            case 'text': {
-                const w = shape.width || 200
-                const h = (shape.fontSize || 16) * 1.4
-                return { x: shape.x - m, y: shape.y - h - m, w: w + m * 2, h: h + 4 + m * 2 }
-            }
-            default:
-                return null
-        }
-    }
-
-    _boundsOverlap(a, b) {
-        return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y)
-    }
-
-    _moveShape(shape, dx, dy) {
+    _resize(shape, handle, dx, dy) {
         const s = { ...shape }
-        switch (s.type) {
-            case 'rect':
-            case 'circle':
-            case 'text':
-                s.x += dx
-                s.y += dy
-                break
-            case 'line':
-            case 'arrow':
-                s.startX += dx
-                s.startY += dy
-                s.endX += dx
-                s.endY += dy
-                break
-            case 'path':
-                if (s.points) {
-                    s.points = s.points.map(p => ({ x: p.x + dx, y: p.y + dy }))
-                }
-                break
+        if (s.type === 'rect') {
+            if (handle === 'se') { s.width = Math.max(10, (s.width || 0) + dx); s.height = Math.max(10, (s.height || 0) + dy) }
+            else if (handle === 'sw') { s.x += dx; s.width = Math.max(10, (s.width || 0) - dx); s.height = Math.max(10, (s.height || 0) + dy) }
+            else if (handle === 'ne') { s.width = Math.max(10, (s.width || 0) + dx); s.y += dy; s.height = Math.max(10, (s.height || 0) - dy) }
+            else if (handle === 'nw') { s.x += dx; s.width = Math.max(10, (s.width || 0) - dx); s.y += dy; s.height = Math.max(10, (s.height || 0) - dy) }
+            else if (handle === 'n') { s.y += dy; s.height = Math.max(10, (s.height || 0) - dy) }
+            else if (handle === 's') { s.height = Math.max(10, (s.height || 0) + dy) }
+            else if (handle === 'e') { s.width = Math.max(10, (s.width || 0) + dx) }
+            else if (handle === 'w') { s.x += dx; s.width = Math.max(10, (s.width || 0) - dx) }
+        } else if (s.type === 'circle') {
+            const r = Math.max(5, (s.radius || 20) + (dx + dy) / 2)
+            s.radius = r
+        } else if (s.type === 'text') {
+            if (handle === 'se') { s.width = Math.max(30, (s.width || 100) + dx); s.height = Math.max(20, (s.height || 30) + dy) }
+            else if (handle === 'e') { s.width = Math.max(30, (s.width || 100) + dx) }
+            else if (handle === 's') { s.height = Math.max(20, (s.height || 30) + dy) }
+        } else if (s.type === 'line' || s.type === 'arrow') {
+            if (handle === 'start') { s.startX += dx; s.startY += dy }
+            else if (handle === 'end') { s.endX += dx; s.endY += dy }
         }
         return s
     }
 
-    _deleteSelected(state) {
-        this.tm.pushHistory()
-        this.tm.state.setState({
-            shapes: state.shapes.filter(s => !state.selectedIds.includes(s.id)),
-            selectedIds: []
-        })
+    _hitHandle(x, y, shape) {
+        const vp = this.tm.viewport
+        const m = 8 / vp.zoomLevel
+        const handles = this._getHandles(shape)
+        for (const h of handles) {
+            if (Math.abs(x - h.x) < m && Math.abs(y - h.y) < m) return h.name
+        }
+        return null
     }
 
-    _selectAll(state) {
-        this.tm.state.setState({
-            selectedIds: state.shapes.filter(s => s.visible !== false && !s.locked).map(s => s.id)
-        })
+    _getHandles(shape) {
+        const vp = this.tm.viewport
+        const s = 7 / vp.zoomLevel
+        const handles = []
+
+        if (shape.type === 'rect' || shape.type === 'text') {
+            const x = shape.x, y = shape.y
+            const w = shape.width || 100, h = (shape.height || shape.fontSize * 1.4 || 30)
+            handles.push({ name: 'nw', x, y }, { name: 'ne', x: x + w, y }, { name: 'sw', x, y: y + h }, { name: 'se', x: x + w, y: y + h })
+            handles.push({ name: 'n', x: x + w / 2, y }, { name: 's', x: x + w / 2, y: y + h }, { name: 'e', x: x + w, y: y + h / 2 }, { name: 'w', x, y: y + h / 2 })
+        } else if (shape.type === 'circle') {
+            const r = shape.radius || 20
+            handles.push({ name: 'n', x: shape.x, y: shape.y - r }, { name: 's', x: shape.x, y: shape.y + r }, { name: 'e', x: shape.x + r, y: shape.y }, { name: 'w', x: shape.x - r, y: shape.y })
+        } else if (shape.type === 'line' || shape.type === 'arrow') {
+            handles.push({ name: 'start', x: shape.startX, y: shape.startY }, { name: 'end', x: shape.endX, y: shape.endY })
+        }
+        return handles
     }
 
-    _nudgeSelected(key, amount, state) {
-        this.tm.pushHistory()
-        const shapes = state.shapes.map(s => {
-            if (!state.selectedIds.includes(s.id)) return s
-            switch (s.type) {
-                case 'rect':
-                case 'circle':
-                case 'text':
-                    return {
-                        ...s,
-                        x: s.x + (key === 'ArrowRight' ? amount : key === 'ArrowLeft' ? -amount : 0),
-                        y: s.y + (key === 'ArrowDown' ? amount : key === 'ArrowUp' ? -amount : 0)
-                    }
-                case 'line':
-                case 'arrow':
-                    return {
-                        ...s,
-                        startX: s.startX + (key === 'ArrowRight' ? amount : key === 'ArrowLeft' ? -amount : 0),
-                        startY: s.startY + (key === 'ArrowDown' ? amount : key === 'ArrowUp' ? -amount : 0),
-                        endX: s.endX + (key === 'ArrowRight' ? amount : key === 'ArrowLeft' ? -amount : 0),
-                        endY: s.endY + (key === 'ArrowDown' ? amount : key === 'ArrowUp' ? -amount : 0)
-                    }
-                case 'path':
-                    return {
-                        ...s,
-                        points: s.points.map(p => ({
-                            x: p.x + (key === 'ArrowRight' ? amount : key === 'ArrowLeft' ? -amount : 0),
-                            y: p.y + (key === 'ArrowDown' ? amount : key === 'ArrowUp' ? -amount : 0)
-                        }))
-                    }
-                default:
-                    return s
+    _drawResizeHandles(shape) {
+        const ctx = this.tm.getCtx()
+        const vp = this.tm.viewport
+        const s = 5 / vp.zoomLevel
+        const handles = this._getHandles(shape)
+        ctx.save()
+        ctx.fillStyle = 'white'
+        ctx.strokeStyle = '#6c5ce7'
+        ctx.lineWidth = 1.5 / vp.zoomLevel
+        for (const h of handles) {
+            ctx.beginPath()
+            ctx.rect(h.x - s, h.y - s, s * 2, s * 2)
+            ctx.fill()
+            ctx.stroke()
+        }
+        ctx.restore()
+    }
+
+    _findAt(x, y, state) {
+        for (let i = state.shapes.length - 1; i >= 0; i--) {
+            const s = state.shapes[i]
+            if (s.visible === false || s.locked) continue
+            if (this._hit(s, x, y)) return s
+        }
+        return null
+    }
+
+    _hit(s, x, y) {
+        const m = 8 / this.tm.viewport.zoomLevel
+        switch (s.type) {
+            case 'rect':
+                if (s.isDiamond) {
+                    const cx = s.x + (s.width || 0) / 2, cy = s.y + (s.height || 0) / 2
+                    const dx = Math.abs(x - cx) / ((s.width || 0) / 2 + m)
+                    const dy = Math.abs(y - cy) / ((s.height || 0) / 2 + m)
+                    return dx + dy <= 1.2
+                }
+                return x >= s.x - m && x <= s.x + (s.width || 0) + m && y >= s.y - m && y <= s.y + (s.height || 0) + m
+            case 'circle':
+                return Math.sqrt((x - s.x) ** 2 + (y - s.y) ** 2) <= (s.radius || 20) + m
+            case 'line': case 'arrow':
+                return this._lineNear(x, y, s.startX, s.startY, s.endX, s.endY, m)
+            case 'path':
+                if (!s.points) return false
+                for (let i = 0; i < s.points.length - 1; i++) {
+                    if (this._lineNear(x, y, s.points[i].x, s.points[i].y, s.points[i + 1].x, s.points[i + 1].y, m)) return true
+                }
+                return false
+            case 'text': {
+                const w = s.width || 100, h = (s.height || (s.fontSize || 20) * 1.4)
+                return x >= s.x - m && x <= s.x + w + m && y >= s.y - m && y <= s.y + h + m
             }
-        })
-        this.tm.state.setState({ shapes })
+            default: return false
+        }
     }
 
-    activate() {
-        if (this.tm.canvas) this.tm.canvas.style.cursor = 'default'
+    _lineNear(px, py, x1, y1, x2, y2, margin) {
+        const dx = x2 - x1, dy = y2 - y1
+        const lenSq = dx * dx + dy * dy
+        if (lenSq === 0) return Math.sqrt((px - x1) ** 2 + (py - y1) ** 2) < margin
+        let t = ((px - x1) * dx + (py - y1) * dy) / lenSq
+        t = Math.max(0, Math.min(1, t))
+        return Math.sqrt((px - (x1 + t * dx)) ** 2 + (py - (y1 + t * dy)) ** 2) < margin
     }
 
-    deactivate() {
-        this.mode = 'idle'
-        this.dragStart = null
-        this.dragShapeIds = null
-        this.marquee = null
-        this.originalShapes = []
+    _move(s, dx, dy) {
+        const n = { ...s }
+        if (n.points) n.points = n.points.map(p => ({ x: p.x + dx, y: p.y + dy }))
+        if (n.type === 'line' || n.type === 'arrow') { n.startX += dx; n.startY += dy; n.endX += dx; n.endY += dy }
+        else { n.x = (n.x || 0) + dx; n.y = (n.y || 0) + dy }
+        return n
     }
+
+    _bounds(s) {
+        const m = 6
+        switch (s.type) {
+            case 'rect': return { x: s.x - m, y: s.y - m, w: (s.width || 0) + m * 2, h: (s.height || 0) + m * 2 }
+            case 'circle': return { x: s.x - (s.radius || 20) - m, y: s.y - (s.radius || 20) - m, w: (s.radius || 20) * 2 + m * 2, h: (s.radius || 20) * 2 + m * 2 }
+            case 'line': case 'arrow': {
+                const x = Math.min(s.startX, s.endX), y = Math.min(s.startY, s.endY)
+                return { x: x - m, y: y - m, w: Math.abs(s.endX - s.startX) + m * 2, h: Math.abs(s.endY - s.startY) + m * 2 }
+            }
+            case 'path': {
+                if (!s.points?.length) return null
+                let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity
+                for (const p of s.points) { x1 = Math.min(x1, p.x); y1 = Math.min(y1, p.y); x2 = Math.max(x2, p.x); y2 = Math.max(y2, p.y) }
+                return { x: x1 - m, y: y1 - m, w: x2 - x1 + m * 2, h: y2 - y1 + m * 2 }
+            }
+            case 'text': return { x: s.x - m, y: s.y - m, w: (s.width || 100) + m * 2, h: (s.height || (s.fontSize || 20) * 1.4) + m * 2 }
+            default: return null
+        }
+    }
+
+    _overlap(a, b) {
+        return !(a.x + a.w < b.x || b.x + b.w < a.x || a.y + a.h < b.y || b.y + b.h < a.y)
+    }
+
+    activate() { this.tm.canvas.style.cursor = 'default' }
+    deactivate() { this.mode = 'idle'; this.marquee = null; this.resizeHandle = null }
 }
