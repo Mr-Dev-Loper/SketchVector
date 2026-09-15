@@ -1,10 +1,10 @@
 export default class EraserTool {
-    constructor(toolManager) {
-        this.tm = toolManager
+    constructor(tm) {
+        this.tm = tm
         this.isErasing = false
         this.erasedIds = new Set()
-        this.eraserRadius = 10
         this.lastPos = null
+        this.eraserRadius = 10
     }
 
     handleMouseDown(pos, e) {
@@ -16,149 +16,107 @@ export default class EraserTool {
 
     handleMouseMove(pos, e) {
         if (!this.isErasing) return
-
         this._eraseAlongPath(this.lastPos, pos)
         this.lastPos = pos
+        this.tm.redraw()
     }
 
     handleMouseUp(pos, e) {
         if (!this.isErasing) return
         this.isErasing = false
-
         if (this.erasedIds.size > 0) {
             this.tm.pushHistory()
-            const state = this.tm.state.getState()
+            const s = this.tm.state.getState()
             this.tm.state.setState({
-                shapes: state.shapes.filter(s => !this.erasedIds.has(s.id)),
-                selectedIds: state.selectedIds.filter(id => !this.erasedIds.has(id))
+                shapes: s.shapes.filter(sh => !this.erasedIds.has(sh.id)),
+                selectedIds: s.selectedIds.filter(id => !this.erasedIds.has(id))
             })
+            this.tm.redraw()
         }
-
         this.erasedIds = new Set()
-        this.lastPos = null
     }
 
     _eraseAt(pos) {
-        const state = this.tm.state.getState()
-        const r = this.eraserRadius / (this.tm.viewport ? this.tm.viewport.zoomLevel : 1)
-
-        for (const shape of state.shapes) {
-            if (this.erasedIds.has(shape.id)) continue
-            if (shape.locked) continue
-
-            if (this._shapeIntersectsCircle(shape, pos.x, pos.y, r)) {
+        const s = this.tm.state.getState()
+        const r = this.eraserRadius / this.tm.viewport.zoomLevel
+        for (const shape of s.shapes) {
+            if (this.erasedIds.has(shape.id) || shape.locked) continue
+            if (this._hitTest(shape, pos.x, pos.y, r)) {
                 this.erasedIds.add(shape.id)
-                this.tm.state.setState({
-                    shapes: state.shapes.filter(s => s.id !== shape.id)
-                })
             }
+        }
+        if (this.erasedIds.size > 0) {
+            this.tm.state.setState({ shapes: s.shapes.filter(sh => !this.erasedIds.has(sh.id)) })
         }
     }
 
     _eraseAlongPath(from, to) {
-        const state = this.tm.state.getState()
-        const r = this.eraserRadius / (this.tm.viewport ? this.tm.viewport.zoomLevel : 1)
-
-        const dx = to.x - from.x
-        const dy = to.y - from.y
+        const dx = to.x - from.x, dy = to.y - from.y
         const dist = Math.sqrt(dx * dx + dy * dy)
+        const r = this.eraserRadius / this.tm.viewport.zoomLevel
         const steps = Math.max(1, Math.ceil(dist / (r / 2)))
-
         for (let i = 0; i <= steps; i++) {
             const t = i / steps
-            const px = from.x + dx * t
-            const py = from.y + dy * t
-
-            const currentShapes = this.tm.state.getState().shapes
-            for (const shape of currentShapes) {
-                if (this.erasedIds.has(shape.id)) continue
-                if (shape.locked) continue
-
-                if (this._shapeIntersectsCircle(shape, px, py, r)) {
+            const px = from.x + dx * t, py = from.y + dy * t
+            const shapes = this.tm.state.getState().shapes
+            for (const shape of shapes) {
+                if (this.erasedIds.has(shape.id) || shape.locked) continue
+                if (this._hitTest(shape, px, py, r)) {
                     this.erasedIds.add(shape.id)
-                    this.tm.state.setState({
-                        shapes: currentShapes.filter(s => s.id !== shape.id)
-                    })
                 }
             }
         }
-    }
-
-    _shapeIntersectsCircle(shape, cx, cy, r) {
-        switch (shape.type) {
-            case 'rect':
-                return this._rectIntersectsCircle(shape.x, shape.y, shape.width, shape.height, cx, cy, r)
-            case 'circle': {
-                const dx = cx - shape.x
-                const dy = cy - shape.y
-                const dist = Math.sqrt(dx * dx + dy * dy)
-                return dist <= shape.radius + r
-            }
-            case 'line':
-            case 'arrow':
-                return this._lineIntersectsCircle(shape.startX, shape.startY, shape.endX, shape.endY, cx, cy, r)
-            case 'path':
-                return this._pathIntersectsCircle(shape.points, cx, cy, r)
-            case 'text': {
-                const w = shape.width || 200
-                const h = (shape.fontSize || 16) * 1.4
-                return this._rectIntersectsCircle(shape.x, shape.y - h, w, h + 4, cx, cy, r)
-            }
-            default:
-                return false
+        if (this.erasedIds.size > 0) {
+            const s = this.tm.state.getState()
+            this.tm.state.setState({ shapes: s.shapes.filter(sh => !this.erasedIds.has(sh.id)) })
         }
     }
 
-    _rectIntersectsCircle(rx, ry, rw, rh, cx, cy, r) {
+    _hitTest(shape, cx, cy, r) {
+        switch (shape.type) {
+            case 'rect': {
+                const closestX = Math.max(shape.x, Math.min(cx, shape.x + (shape.width || 0)))
+                const closestY = Math.max(shape.y, Math.min(cy, shape.y + (shape.height || 0)))
+                const dx = cx - closestX, dy = cy - closestY
+                return dx * dx + dy * dy <= r * r
+            }
+            case 'circle': {
+                const dx = cx - shape.x, dy = cy - shape.y
+                return Math.sqrt(dx * dx + dy * dy) <= (shape.radius || 20) + r
+            }
+            case 'line': case 'arrow':
+                return this._lineHit(shape.startX, shape.startY, shape.endX, shape.endY, cx, cy, r)
+            case 'path':
+                if (!shape.points) return false
+                for (let i = 0; i < shape.points.length - 1; i++) {
+                    if (this._lineHit(shape.points[i].x, shape.points[i].y, shape.points[i + 1].x, shape.points[i + 1].y, cx, cy, r)) return true
+                }
+                return false
+            case 'text': {
+                const w = shape.width || 100, h = (shape.fontSize || 20) * 1.4
+                return this._rectHit(shape.x, shape.y - h, w, h + 4, cx, cy, r)
+            }
+            default: return false
+        }
+    }
+
+    _rectHit(rx, ry, rw, rh, cx, cy, r) {
         const closestX = Math.max(rx, Math.min(cx, rx + rw))
         const closestY = Math.max(ry, Math.min(cy, ry + rh))
-        const dx = cx - closestX
-        const dy = cy - closestY
-        return (dx * dx + dy * dy) <= (r * r)
+        const dx = cx - closestX, dy = cy - closestY
+        return dx * dx + dy * dy <= r * r
     }
 
-    _lineIntersectsCircle(x1, y1, x2, y2, cx, cy, r) {
-        const dx = x2 - x1
-        const dy = y2 - y1
+    _lineHit(x1, y1, x2, y2, cx, cy, r) {
+        const dx = x2 - x1, dy = y2 - y1
         const lenSq = dx * dx + dy * dy
-
-        if (lenSq === 0) {
-            const d = Math.sqrt((cx - x1) ** 2 + (cy - y1) ** 2)
-            return d <= r
-        }
-
+        if (lenSq === 0) return Math.sqrt((cx - x1) ** 2 + (cy - y1) ** 2) <= r
         let t = ((cx - x1) * dx + (cy - y1) * dy) / lenSq
         t = Math.max(0, Math.min(1, t))
-
-        const nearX = x1 + t * dx
-        const nearY = y1 + t * dy
-        const dist = Math.sqrt((cx - nearX) ** 2 + (cy - nearY) ** 2)
-
-        return dist <= r
+        const nx = x1 + t * dx, ny = y1 + t * dy
+        return Math.sqrt((cx - nx) ** 2 + (cy - ny) ** 2) <= r
     }
 
-    _pathIntersectsCircle(points, cx, cy, r) {
-        if (!points || points.length < 2) return false
-
-        for (let i = 0; i < points.length - 1; i++) {
-            if (this._lineIntersectsCircle(
-                points[i].x, points[i].y,
-                points[i + 1].x, points[i + 1].y,
-                cx, cy, r
-            )) {
-                return true
-            }
-        }
-        return false
-    }
-
-    activate() {
-        if (this.tm.canvas) this.tm.canvas.style.cursor = 'crosshair'
-    }
-
-    deactivate() {
-        this.isErasing = false
-        this.erasedIds = new Set()
-        this.lastPos = null
-    }
+    activate() { this.tm.canvas.style.cursor = 'crosshair' }
+    deactivate() { this.isErasing = false; this.erasedIds = new Set() }
 }

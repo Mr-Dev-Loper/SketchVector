@@ -1,5 +1,5 @@
-const STORAGE_KEY = 'sketchvector_data'
-const AUTO_SAVE_KEY = 'sketchvector_autosave'
+const STORAGE_KEY = 'sketchvector_projects'
+const AUTOSAVE_KEY = 'sketchvector_autosave'
 
 export default class Storage {
     saveProject(name, state) {
@@ -10,15 +10,11 @@ export default class Storage {
 
     loadProject(name) {
         const projects = this._getProjects()
-        return projects[name] ? projects[name].state : null
+        return projects[name]?.state || null
     }
 
     listProjects() {
-        const projects = this._getProjects()
-        return Object.keys(projects).map(name => ({
-            name,
-            savedAt: projects[name].savedAt
-        }))
+        return Object.keys(this._getProjects())
     }
 
     deleteProject(name) {
@@ -28,17 +24,14 @@ export default class Storage {
     }
 
     autoSave(state) {
-        localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify({ state, savedAt: Date.now() }))
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state))
     }
 
     loadAutoSave() {
-        const raw = localStorage.getItem(AUTO_SAVE_KEY)
-        if (!raw) return null
         try {
-            return JSON.parse(raw).state
-        } catch {
-            return null
-        }
+            const data = localStorage.getItem(AUTOSAVE_KEY)
+            return data ? JSON.parse(data) : null
+        } catch { return null }
     }
 
     exportJSON(state) {
@@ -46,20 +39,12 @@ export default class Storage {
     }
 
     importJSON(json) {
-        try {
-            return JSON.parse(json)
-        } catch {
-            return null
-        }
+        return JSON.parse(json)
     }
 
     _getProjects() {
-        const raw = localStorage.getItem(STORAGE_KEY)
-        if (!raw) return {}
         try {
-            return JSON.parse(raw)
-        } catch {
-            return {}
-        }
+            return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
+        } catch { return {} }
     }
 }

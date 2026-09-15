@@ -1,91 +1,47 @@
 export default class PenTool {
-    constructor(toolManager) {
-        this.tm = toolManager
+    constructor(tm) {
+        this.tm = tm
         this.isDrawing = false
         this.currentPath = null
-        this.lastPoint = null
     }
 
     handleMouseDown(pos, e) {
-        const state = this.tm.state.getState()
+        const s = this.tm.state.getState()
         this.currentPath = {
             type: 'path',
-            id: this._generateId(),
+            id: 's_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             points: [{ x: pos.x, y: pos.y }],
-            stroke: state.colors.stroke,
+            stroke: s.stroke || '#1e1e1e',
             fill: 'transparent',
-            strokeWidth: state.strokeWidth,
-            opacity: state.opacity,
-            handDrawn: state.handDrawn
+            strokeWidth: s.strokeWidth || 2,
+            opacity: s.opacity !== undefined ? s.opacity : 1,
         }
-        this.lastPoint = pos
         this.isDrawing = true
     }
 
     handleMouseMove(pos, e) {
         if (!this.isDrawing || !this.currentPath) return
-
-        const dx = pos.x - this.lastPoint.x
-        const dy = pos.y - this.lastPoint.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-
-        if (dist < 2 / (this.tm.viewport ? this.tm.viewport.zoomLevel : 1)) return
-
-        const pressure = e.pressure !== undefined && e.pressure > 0 ? e.pressure : 0.5
+        const pts = this.currentPath.points
+        const last = pts[pts.length - 1]
+        const dx = pos.x - last.x
+        const dy = pos.y - last.y
+        if (dx * dx + dy * dy < 4) return
         this.currentPath.points.push({ x: pos.x, y: pos.y })
-        this.currentPath._lastPressure = pressure
-        this.lastPoint = pos
-
         this.tm.redraw()
     }
 
     handleMouseUp(pos, e) {
         if (!this.isDrawing || !this.currentPath) return
         this.isDrawing = false
-
         if (this.currentPath.points.length >= 2) {
-            this.currentPath.points = this._simplifyPoints(this.currentPath.points, 1.5)
             this.tm.pushHistory()
-            const state = this.tm.state.getState()
-            this.tm.state.setState({
-                shapes: [...state.shapes, this.currentPath]
-            })
+            const s = this.tm.state.getState()
+            this.tm.state.setState({ shapes: [...s.shapes, this.currentPath] })
         }
-
         this.currentPath = null
-        this.lastPoint = null
         this.tm.redraw()
     }
 
-    _simplifyPoints(points, tolerance) {
-        if (points.length <= 2) return points
-        const simplified = [points[0]]
-        for (let i = 1; i < points.length - 1; i++) {
-            const prev = simplified[simplified.length - 1]
-            const curr = points[i]
-            const dx = curr.x - prev.x
-            const dy = curr.y - prev.y
-            if (Math.sqrt(dx * dx + dy * dy) >= tolerance) {
-                simplified.push(curr)
-            }
-        }
-        simplified.push(points[points.length - 1])
-        return simplified
-    }
-
-    _generateId() {
-        return 'shape_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
-    }
-
-    activate() {
-        if (this.tm.canvas) this.tm.canvas.style.cursor = 'crosshair'
-    }
-
-    deactivate() {
-        if (this.isDrawing) {
-            this.isDrawing = false
-            this.currentPath = null
-            this.lastPoint = null
-        }
-    }
+    activate() { this.tm.canvas.style.cursor = 'crosshair' }
+    deactivate() { this.isDrawing = false; this.currentPath = null }
 }

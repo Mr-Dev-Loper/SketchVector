@@ -1,19 +1,19 @@
 export default class StateManager {
     constructor() {
         this._state = {
+            activeTool: 'select',
             shapes: [],
             selectedIds: [],
-            activeTool: 'select',
-            viewport: { x: 0, y: 0, zoom: 1 },
-            colors: { fill: 'transparent', stroke: '#000000' },
+            stroke: '#1e1e1e',
+            fill: 'transparent',
             strokeWidth: 2,
             opacity: 1,
             handDrawn: false,
-            layers: [{ id: 'default', name: 'Layer 1', visible: true, locked: false }],
-            gridEnabled: false,
-            theme: 'light'
+            fontSize: 20,
+            fontFamily: 'Arial',
+            theme: 'light',
         }
-        this._listeners = new Set()
+        this._listeners = []
     }
 
     getState() {
@@ -22,21 +22,17 @@ export default class StateManager {
 
     setState(partial) {
         this._state = { ...this._state, ...partial }
-        this.notify()
+        this._notify()
     }
 
-    subscribe(listener) {
-        this._listeners.add(listener)
-        return () => this._listeners.delete(listener)
-    }
-
-    unsubscribe(listener) {
-        this._listeners.delete(listener)
-    }
-
-    notify() {
-        for (const listener of this._listeners) {
-            listener(this._state)
+    subscribe(fn) {
+        this._listeners.push(fn)
+        return () => {
+            this._listeners = this._listeners.filter(l => l !== fn)
         }
+    }
+
+    _notify() {
+        for (const fn of this._listeners) fn(this._state)
     }
 }
