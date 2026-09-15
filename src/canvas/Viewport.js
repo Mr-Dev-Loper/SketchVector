@@ -1,84 +1,63 @@
 export default class Viewport {
     constructor() {
-        this.x = 0;
-        this.y = 0;
-        this.zoomLevel = 1;
-        this.minZoom = 0.1;
-        this.maxZoom = 10;
+        this.x = 0
+        this.y = 0
+        this.zoomLevel = 3
+        this.minZoom = 0.1
+        this.maxZoom = 30
+        this.baseZoom = 3
     }
 
     pan(dx, dy) {
-        this.x += dx;
-        this.y += dy;
+        this.x += dx
+        this.y += dy
     }
 
-    zoom(delta, centerX, centerY) {
-        const zoomFactor = delta > 0 ? 0.9 : 1.1;
-        const newZoom = Math.min(this.maxZoom, Math.max(this.minZoom, this.zoomLevel * zoomFactor));
-
-        const worldX = (centerX - this.x) / this.zoomLevel;
-        const worldY = (centerY - this.y) / this.zoomLevel;
-
-        this.zoomLevel = newZoom;
-        this.x = centerX - worldX * this.zoomLevel;
-        this.y = centerY - worldY * this.zoomLevel;
+    zoom(delta, cx, cy) {
+        const step = this.baseZoom * 0.1
+        const newZoom = Math.min(this.maxZoom, Math.max(this.minZoom, this.zoomLevel + delta * step))
+        const wx = (cx - this.x) / this.zoomLevel
+        const wy = (cy - this.y) / this.zoomLevel
+        this.zoomLevel = newZoom
+        this.x = cx - wx * this.zoomLevel
+        this.y = cy - wy * this.zoomLevel
     }
 
-    screenToWorld(screenX, screenY) {
-        return {
-            x: (screenX - this.x) / this.zoomLevel,
-            y: (screenY - this.y) / this.zoomLevel
-        };
+    setZoom(newZoom) {
+        const clamped = Math.min(this.maxZoom, Math.max(this.minZoom, newZoom))
+        const cx = window.innerWidth / 2
+        const cy = window.innerHeight / 2
+        const wx = (cx - this.x) / this.zoomLevel
+        const wy = (cy - this.y) / this.zoomLevel
+        this.zoomLevel = clamped
+        this.x = cx - wx * this.zoomLevel
+        this.y = cy - wy * this.zoomLevel
     }
 
-    worldToScreen(worldX, worldY) {
-        return {
-            x: worldX * this.zoomLevel + this.x,
-            y: worldY * this.zoomLevel + this.y
-        };
+    getDisplayZoom() {
+        return Math.round((this.zoomLevel / this.baseZoom) * 100)
     }
 
-    fitToScreen(width, height, contentBounds) {
-        if (!contentBounds) {
-            this.x = 0;
-            this.y = 0;
-            this.zoomLevel = 1;
-            return;
-        }
-
-        const padding = 50;
-        const contentWidth = contentBounds.maxX - contentBounds.minX;
-        const contentHeight = contentBounds.maxY - contentBounds.minY;
-
-        if (contentWidth === 0 || contentHeight === 0) {
-            this.x = 0;
-            this.y = 0;
-            this.zoomLevel = 1;
-            return;
-        }
-
-        const scaleX = (width - padding * 2) / contentWidth;
-        const scaleY = (height - padding * 2) / contentHeight;
-        this.zoomLevel = Math.min(scaleX, scaleY);
-
-        this.x = (width - contentWidth * this.zoomLevel) / 2 - contentBounds.minX * this.zoomLevel;
-        this.y = (height - contentHeight * this.zoomLevel) / 2 - contentBounds.minY * this.zoomLevel;
+    screenToWorld(sx, sy) {
+        return { x: (sx - this.x) / this.zoomLevel, y: (sy - this.y) / this.zoomLevel }
     }
 
-    getTransform() {
-        return {
-            x: this.x,
-            y: this.y,
-            zoom: this.zoomLevel
-        };
+    worldToScreen(wx, wy) {
+        return { x: wx * this.zoomLevel + this.x, y: wy * this.zoomLevel + this.y }
+    }
+
+    fitToScreen(w, h, bounds) {
+        if (!bounds) { this.x = 0; this.y = 0; this.zoomLevel = 3; return }
+        const pad = 60
+        const cw = bounds.maxX - bounds.minX, ch = bounds.maxY - bounds.minY
+        if (cw <= 0 || ch <= 0) { this.x = 0; this.y = 0; this.zoomLevel = 3; return }
+        this.zoomLevel = Math.min((w - pad * 2) / cw, (h - pad * 2) / ch)
+        this.x = (w - cw * this.zoomLevel) / 2 - bounds.minX * this.zoomLevel
+        this.y = (h - ch * this.zoomLevel) / 2 - bounds.minY * this.zoomLevel
     }
 
     applyTransform(ctx) {
-        ctx.translate(this.x, this.y);
-        ctx.scale(this.zoomLevel, this.zoomLevel);
-    }
-
-    resetTransform(ctx) {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.translate(this.x, this.y)
+        ctx.scale(this.zoomLevel, this.zoomLevel)
     }
 }
